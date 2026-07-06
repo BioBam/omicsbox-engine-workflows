@@ -1,1 +1,14 @@
+# Nextflow temporary working directory
+work/
 
+# Nextflow hidden cache and history directory
+.nextflow/
+
+# Ignore all Nextflow hidden files and logs
+.nextflow*
+
+#Ignore windows zone identifier metadata
+*:Zone.Identifier
+
+#Ignore results folder
+results/
