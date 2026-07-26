@@ -36,4 +36,4 @@ snakemake -s snakemake/workflows/<workflow>/Snakefile dump_config --cores 1
 
 ---
 
-**For the full parameter reference, cluster installation guides, and biological background, see our [Wiki](wiki).**
+**For detailed execution guides, self-documenting configuration templates, OmicsBox integration details, and developer instructions on how to modify workflows, please see our [Wiki](wiki).**
