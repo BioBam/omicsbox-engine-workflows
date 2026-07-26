@@ -1,6 +1,7 @@
 // =============================================================================
 // FILE: functional_annotation.nf
-nextflow.enable.dsl=2
+// Functional Annotation Pipeline: DIAMOND BLAST + GO Mapping -> BLAST2GO Annotation -> InterProScan + EggNOG -> Merge & Validate -> EC Mapping -> Charts, GO Graph & Gene-Set Export
+// =============================================================================
 
 include { LOAD_FASTA                                       } from '../../modules/functional_analysis/load_fasta.nf'
 include { DIAMOND_BLAST                                    } from '../../modules/functional_analysis/diamond_blast.nf'
@@ -29,17 +30,21 @@ workflow {
 
     main:
 
+    // -------------------------------------------------------------------------
+    // Config template export: --dump_config copies this workflow's .config to
+    // the launch directory and exits, so the user can edit it and pass it via -c.
+    // -------------------------------------------------------------------------
     if (params.dump_config) {
-        // 1. Define the source path (inside the repo, using workflow.projectDir)
-        def sourceConfig = file("${workflow.projectDir}/workflows/functional_annotation/functional_annotation.config")
-        
-        // 2. Define the target path (the current directory where the user is executing the command)
+        // 1. Source: this workflow's config template (sibling of the .nf; projectDir = workflow dir under -main-script)
+        def sourceConfig = file("${moduleDir}/functional_annotation.config")
+
+        // 2. Target: the current launch directory
         def targetConfig = file("./functional_annotation.config")
 
         if (sourceConfig.exists()) {
             // 3. Physically copy the file to the user's environment
             sourceConfig.copyTo(targetConfig)
-            
+
             log.info "========================================================================="
             log.info "  [OK] Configuration template successfully exported!"
             log.info "========================================================================="
@@ -53,10 +58,11 @@ workflow {
         } else {
             log.error "  [ERROR] Could not find the internal template at: ${sourceConfig}"
         }
-        
+
         // 4. Stop Nextflow safely with exit code 0 (success)
         exit 0
     }
+
 
     // -------------------------------------------------------------------------
     // Safety checks
@@ -71,13 +77,18 @@ workflow {
     // -------------------------------------------------------------------------
     def ch_fasta = channel.fromPath(params.input_fasta, checkIfExists: true)
 
+    // Optional custom GO-Slim OBO file (only used with --option=custom). Empty channel -> module omits --i-go-slim-obo-file.
+    def ch_goslim_obo = params.goslim.obo_file
+        ? channel.fromPath(params.goslim.obo_file, checkIfExists: true).first()
+        : channel.value([])
+
     // -------------------------------------------------------------------------
-    // 01 — Load sequences into OmicsBox project
+    // 01 - Load sequences into OmicsBox project
     // -------------------------------------------------------------------------
     LOAD_FASTA(ch_fasta)
 
     // -------------------------------------------------------------------------
-    // 02-03 — Sequence homology search & GO mapping
+    // 02-03 - Sequence homology search & GO mapping
     // DIAMOND_BLAST and GO_MAPPING both consume the same LOAD_FASTA project
     // and run in parallel, branching the workflow into two annotation streams
     // -------------------------------------------------------------------------
@@ -87,41 +98,36 @@ workflow {
     GO_MAPPING_CHARTS(GO_MAPPING.out.mapped_project)
 
     // -------------------------------------------------------------------------
-    // 04 — Initial GO annotation via BLAST2GO
+    // 04 - Initial GO annotation via BLAST2GO
     // -------------------------------------------------------------------------
     GO_ANNOTATION(GO_MAPPING.out.mapped_project)
     BLAST2GO_ANNOTATION_CHARTS(GO_ANNOTATION.out.annotated_project)
 
     // -------------------------------------------------------------------------
-    // 05-07 — Parallel domain & orthology prediction
-    // Three independent annotation branches, each consuming different inputs:
-    //   - EGGNOG_MAPPER: consumes raw FASTA directly
-    //   - INTERPROSCAN: consumes LOAD_FASTA project (same as DIAMOND_BLAST)
-    //   - GO_ANNOTATION: consumes GO_MAPPING project (already computed above)
+    // 05-06 - Parallel domain & orthology prediction
+    // INTERPROSCAN consumes the LOAD_FASTA project (same as DIAMOND_BLAST);
+    // EGGNOG_MAPPER consumes the raw FASTA directly.
     // -------------------------------------------------------------------------
     EGGNOG_MAPPER(ch_fasta)
     INTERPROSCAN(LOAD_FASTA.out.fasta_project)
     IPS_CHARTS(INTERPROSCAN.out.ips_project)
 
     // -------------------------------------------------------------------------
-    // 08-10 — Multi-branch project consolidation
-    // COMBINE_PROJECTS merges GO annotation + InterProScan branches
-    // MERGE_IPS_GOS_TO_ANNOTATION integrates domain terms into the combined project
-    // MERGE_EGGNOG_5_GOS integrates EggNOG functional data
+    // 07-09 - Multi-branch project consolidation (GO annotation + InterProScan + EggNOG)
     // -------------------------------------------------------------------------
     COMBINE_PROJECTS(GO_ANNOTATION.out.annotated_project, INTERPROSCAN.out.ips_project)
     MERGE_IPS_GOS_TO_ANNOTATION(COMBINE_PROJECTS.out.combined_project)
     MERGE_EGGNOG_5_GOS(MERGE_IPS_GOS_TO_ANNOTATION.out.integrated_project, EGGNOG_MAPPER.out.eggnog_project)
 
     // -------------------------------------------------------------------------
-    // 11-13 — Final curation, enzyme mapping & comprehensive reporting
+    // 10-13 - Final curation, enzyme mapping & comprehensive reporting
     // All downstream processes consume the unified, fully-annotated master project
     // -------------------------------------------------------------------------
     VALIDATE_GO_ANNOTATION(MERGE_EGGNOG_5_GOS.out.final_project)
     EC_CODE_MAPPING(VALIDATE_GO_ANNOTATION.out.validated_project)
     FINAL_ANNOTATION_CHARTS(EC_CODE_MAPPING.out.ec_mapped_project)
     COMBINED_GO_GRAPH(EC_CODE_MAPPING.out.ec_mapped_project)
-    //EXPORT_GENE_SETS(EC_CODE_MAPPING.out.ec_mapped_project)
-    // GO_SLIM(EC_CODE_MAPPING.out.ec_mapped_project)
-    // GOSLIM_ANNOTATION_CHARTS(GO_SLIM.out.goslim_project)
+    EXPORT_GENE_SETS(EC_CODE_MAPPING.out.ec_mapped_project)
+    GO_SLIM(EC_CODE_MAPPING.out.ec_mapped_project, ch_goslim_obo)
+    GOSLIM_ANNOTATION_CHARTS(GO_SLIM.out.goslim_project)
 }

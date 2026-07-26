@@ -1,17 +1,15 @@
-// --- FILE: modules/combine_projects.nf ---
-// Wraps: omicsbox combine-projects  |  backend: LEGACY_SYNC
-// Merges multiple OmicsBox projects into one
-nextflow.enable.dsl=2
+// --- FILE: modules/utilities/combine_projects.nf ---
+// Wraps: omicsbox combine-projects
+// Merges multiple OmicsBox projects into one.
 
 process COMBINE_PROJECTS {
 
     input:
-    // IPS project (.box) from INTERPROSCAN and annotated project (.box) from GO_ANNOTATION.
-    path ips_project
-    path annotated_project
+    path ips_project         // OmicsBox project (.box) containing InterProScan domain annotations
+    path annotated_project   // OmicsBox project (.box) containing GO functional annotations
 
     output:
-    path "${task.ext.outdir}/*", emit: combined_project
+    path "${task.ext.outdir}/combined_project.box", emit: combined_project   // Merged OmicsBox project
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

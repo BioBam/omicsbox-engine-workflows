@@ -1,24 +1,21 @@
-// --- FILE: modules/edger.nf ---
-// Wraps: omicsbox edger  |  backend: WJOB_ASYNC
+// --- FILE: modules/transcriptomics/edger.nf ---
+// Wraps: omicsbox edger
 // Pairwise differential expression analysis with edgeR.
-nextflow.enable.dsl=2
 
 process EDGER {
 
     input:
-    path count_table_project  
-    path design_file           // Tab-delimited experimental design file 
+    path count_table_project   // AbstractCountTable project (.box)
+    path design_file           // Tab-delimited experimental design file
 
     output:
-    path "${task.ext.outdir}/*output*.box",  emit: results  // EdgeRObject project containing pairwise analysis results
-    path "${task.ext.outdir}/*report*.box", emit: report   //  Report
+    path "${task.ext.outdir}/*output*.box",  emit: results  // EdgeRObject project (pairwise DE results)
+    path "${task.ext.outdir}/*report*.box", emit: report   // EdgeR report
 
     script:
-    def outdir     = task.ext.outdir ?: task.process.toLowerCase()
-    def args       = task.ext.args   ?: ''
+    def outdir = task.ext.outdir ?: task.process.toLowerCase()
+    def args = task.ext.args ?: ''
 
-    // WJOB_ASYNC
-    def cloud_flag = params.cloud_folder ? "--cloud-folder=${params.cloud_folder}" : ""
 
     """
     mkdir -p ${outdir}
@@ -26,7 +23,6 @@ process EDGER {
         --i-count-table=\$PWD/${count_table_project} \\
         --i-file-design-table=\$PWD/${design_file} \\
         --local-folder=\$PWD/${outdir} \\
-        ${cloud_flag} \\
         ${args}
     """
 }

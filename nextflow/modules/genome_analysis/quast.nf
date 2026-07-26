@@ -1,25 +1,22 @@
-// --- FILE: modules/quast.nf ---
-// Wraps: omicsbox quast  |  backend: WJOB_ASYNC
+// --- FILE: modules/genome_analysis/quast.nf ---
+// Wraps: omicsbox quast
 // Quality assessment of genome assemblies using QUAST.
-nextflow.enable.dsl=2
 
 process QUAST {
 
     input:
-    path assembly              
-    path reference             
+    path assembly    // Assembled genome FASTA file(s) to evaluate
+    path reference   // Reference genome FASTA file
 
     output:
-    path "${task.ext.outdir}/*", emit: quast_results            // QUAST results 
-    path "${task.ext.outdir}/*report*.box", emit: report        // OmicsBox report
-    path "${task.ext.outdir}/*chart*", emit: ngx_chart, optional: true  // NGx chart visualization
+    path "${task.ext.outdir}/*results*.box", emit: results                 // QUAST results project
+    path "${task.ext.outdir}/*report*.box", emit: report                   // QUAST report
+    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart  // QUAST chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
     def args = task.ext.args ?: ''
 
-    // WJOB_ASYNC
-    def cloud_flag = params.cloud_folder ? "--cloud-folder=${params.cloud_folder}" : ""
 
     """
     mkdir -p ${outdir}
@@ -27,7 +24,6 @@ process QUAST {
         --i-assemblies=${assembly instanceof List ? assembly.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${assembly}"} \\
         --i-reference=\$PWD/${reference} \\
         --local-folder=\$PWD/${outdir} \\
-        ${cloud_flag} \\
         ${args}
     """
 }

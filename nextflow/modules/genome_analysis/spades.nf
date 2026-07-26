@@ -1,37 +1,35 @@
-// --- FILE: modules/spades.nf ---
-// Wraps: omicsbox spades  |  backend: WJOB_ASYNC
+// --- FILE: modules/genome_analysis/spades.nf ---
+// Wraps: omicsbox spades
 // DNA-Seq de novo genome assembly with comprehensive mate-pair and hybrid assembly support.
-nextflow.enable.dsl=2
 
 process SPADES {
 
     input:
     path reads                   // FASTQ reads (single-end or paired-end)
-    // Optional Mate-Pair channels (3 orientations)
-    path opt_mp_fr, optional: true            // Optional: Mate-pair reads (FR orientation)
-    path opt_mp_rf, optional: true            // Optional: Mate-pair reads (RF orientation)
-    path opt_mp_ff, optional: true            // Optional: Mate-pair reads (FF orientation)
-    // Optional Hybrid Assembly channels (Sanger, Long-reads, Contigs)
-    path sanger_reads, optional: true         // Optional: Sanger sequencing reads
-    path pacbio_reads, optional: true         // Optional: PacBio long reads for hybrid assembly
-    path nanopore_reads, optional: true       // Optional: Nanopore long reads for hybrid assembly
-    path trusted_contigs, optional: true      // Optional: Trusted contigs for hybrid assembly
-    path untrusted_contigs, optional: true    // Optional: Untrusted contigs for hybrid assembly
+    path opt_mp_fr            // Optional: Mate-pair reads (FR orientation)
+    path opt_mp_rf            // Optional: Mate-pair reads (RF orientation)
+    path opt_mp_ff            // Optional: Mate-pair reads (FF orientation)
+    path sanger_reads         // Optional: Sanger sequencing reads
+    path pacbio_reads         // Optional: PacBio long reads for hybrid assembly
+    path nanopore_reads       // Optional: Nanopore long reads for hybrid assembly
+    path trusted_contigs      // Optional: Trusted contigs for hybrid assembly
+    path untrusted_contigs    // Optional: Untrusted contigs for hybrid assembly
 
     output:
-    path "${task.ext.outdir}/*contigs*.fasta", emit: contigs             // Assembled contigs FASTA file
-    path "${task.ext.outdir}/*scaffolds*.fasta", emit: scaffolds         // Assembled scaffolds FASTA file
-    path "${task.ext.outdir}/*report*.box", emit: report                // OmicsBox report
-    path "${task.ext.outdir}/*Nx_plot*", emit: nx_plot, optional: true  // Nx plot chart
+    path "${task.ext.outdir}/scaffolds.fasta", emit: scaffolds                                       // Scaffolds FASTA
+    path "${task.ext.outdir}/contigs.fasta", emit: contigs                                           // Contigs FASTA
+    path "${task.ext.outdir}/*report*.box", emit: report                                             // SPAdes report (spades_report.box)
+    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart                            // SPAdes Nx-plot chart (spades_chart.box; extension follows chart_format)
+    path "${task.ext.outdir}/assembly_graph_with_scaffolds.gfa", emit: assembly_graph, optional: true                // Assembly graph with scaffolds (only if --save-graph=true)
+    path "${task.ext.outdir}/assembly_graph_after_simplification.gfa", emit: assembly_graph_simplified, optional: true  // Simplified assembly graph (only if --save-graph=true)
 
     script:
-    def outdir        = task.ext.outdir ?: task.process.toLowerCase()
-    def args          = task.ext.args   ?: ''
+    def outdir = task.ext.outdir ?: task.process.toLowerCase()
+    def args = task.ext.args ?: ''
     def is_single_end = params.input_single_end ? true : false
 
-    // =====================================================================
-    // MAIN READS LOGIC (from Trimmomatic)
-    // =====================================================================
+    // paired_end_library_type selects which SPAdes paired-end flag variant to use
+    // (e.g. regular paired-end vs mate-pair library)
     def library_type = params.spades.paired_end_library_type
     def reads_list = reads instanceof List
         ? reads.collect { file -> "\$PWD/${file}" }.join(',')
@@ -40,19 +38,16 @@ process SPADES {
         ? "--i-input-sequencing-data-spades-single-end=${reads_list}"
         : "--i-input-sequencing-data-spades-${library_type}=${reads_list}"
 
-    // =====================================================================
-    // PAIRED-END PATTERN LOGIC (Robust Fallback)
-    // =====================================================================
+    // Paired-end pattern flags tell OmicsBox how to pair up R1/R2 files by name
     def pattern_flags = ""
     if (!is_single_end) {
-        def up_pat = params.keySet().contains('upstream_pattern') && params.upstream_pattern ? params.upstream_pattern : '_1'
-        def down_pat = params.keySet().contains('downstream_pattern') && params.downstream_pattern ? params.downstream_pattern : '_2'
+        def up_pat = params.getOrDefault('upstream_pattern', '_1')
+        def down_pat = params.getOrDefault('downstream_pattern', '_2')
         pattern_flags = "--upstream-pattern=${up_pat} --downstream-pattern=${down_pat}"
     }
 
-    // =====================================================================
-    // OPTIONAL MATE-PAIR LOGIC (Triggers --use-mp-optional-data=true)
-    // =====================================================================
+    // Optional-input convention: unwired mate-pair channels arrive as an empty
+    // List (channel.value([])); providing any of them enables --use-mp-optional-data=true.
     def has_mp_fr = opt_mp_fr ? opt_mp_fr.toString() != '[]' : false
     def has_mp_rf = opt_mp_rf ? opt_mp_rf.toString() != '[]' : false
     def has_mp_ff = opt_mp_ff ? opt_mp_ff.toString() != '[]' : false
@@ -69,9 +64,8 @@ process SPADES {
         ? "--i-mp-optional-data-spades-mate-pair-ff=${opt_mp_ff instanceof List ? opt_mp_ff.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${opt_mp_ff}"}"
         : ""
 
-    // =====================================================================
-    // OPTIONAL HYBRID ASSEMBLY LOGIC (Triggers --use-data-for-hybrid-assembly=true)
-    // =====================================================================
+    // Optional-input convention: unwired hybrid-assembly channels arrive as an
+    // empty List (channel.value([])); providing any of them enables --use-data-for-hybrid-assembly=true.
     def has_sanger = sanger_reads ? sanger_reads.toString() != '[]' : false
     def has_pacbio = pacbio_reads ? pacbio_reads.toString() != '[]' : false
     def has_nanopore = nanopore_reads ? nanopore_reads.toString() != '[]' : false
@@ -96,8 +90,6 @@ process SPADES {
         ? "--i-data-for-hybrid-assembly-spades-untrusted-contigs=${untrusted_contigs instanceof List ? untrusted_contigs.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${untrusted_contigs}"}"
         : ""
 
-    // WJOB_ASYNC: --cloud-folder required for cloud-backed runs
-    def cloud_flag = params.cloud_folder ? "--cloud-folder=${params.cloud_folder}" : ""
 
     """
     mkdir -p ${outdir}
@@ -114,9 +106,7 @@ process SPADES {
         ${nanopore_flag} \\
         ${trusted_flag} \\
         ${untrusted_flag} \\
-        --i-graph-folder=\$PWD/${outdir}/graphs \\
         --local-folder=\$PWD/${outdir} \\
-        ${cloud_flag} \\
         ${args}
     """
 }

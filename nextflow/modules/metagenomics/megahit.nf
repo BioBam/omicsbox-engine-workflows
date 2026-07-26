@@ -1,56 +1,47 @@
 // --- FILE: modules/metagenomics/megahit.nf ---
-// Wraps: omicsbox megahit  |  backend: WJOB_ASYNC
+// Wraps: omicsbox megahit
 // De novo metagenome assembly using MEGAHIT.
-nextflow.enable.dsl=2
 
 process MEGAHIT {
 
     input:
-    path reads                  // Contaminant-free reads (single-end or paired-end, List of FASTQ files)
+    path reads                  // Input reads (single-end or paired-end, List of FASTQ files)
 
     output:
-    path "${task.ext.outdir}/*contigs*.fasta", emit: contigs         // Assembled contigs FASTA file
-    path "${task.ext.outdir}/*report*.box", emit: report             // OmicsBox report
-    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart  // OmicsBox chart
+    path "${task.ext.outdir}/*contigs*.fasta", emit: contigs                 // Assembled contigs FASTA
+    path "${task.ext.outdir}/*report*.box", emit: report                     // MEGAHIT report
+    path "${task.ext.outdir}/nx-plot.${params.chart_format}", emit: nx_plot  // Nx plot chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
     def args = task.ext.args ?: ''
     def is_single_end = params.input_single_end ? true : false
 
-    // =====================================================================
-    // DYNAMIC: Single-End vs Paired-End input flag
-    // Metagenomics typically uses paired-end, but single-end is supported
-    // =====================================================================
-    def reads_list = reads instanceof List
-        ? reads.collect { file -> "\$PWD/${file}" }.join(',')
-        : "\$PWD/${reads}"
+    // OmicsBox megahit expects one --i-read-files flag per file, repeated (not comma-joined).
+    def input_flag = reads instanceof List
+        ? reads.collect { file -> "--i-read-files=\$PWD/${file}" }.join(' ')
+        : "--i-read-files=\$PWD/${reads}"
 
-    def input_flag = is_single_end
-        ? "--i-input-sequencing-data-single=${reads_list}"
-        : "--i-input-sequencing-data-paired=${reads_list}"
+    def seq_flag = is_single_end ? "--sequencing=single" : "--sequencing=paired"
 
-    // =====================================================================
-    // DYNAMIC: Paired-end pattern flags (only if paired-end input)
-    // =====================================================================
     def pattern_flags = ""
+    // Only paired-end needs these: they tell OmicsBox how to pair up R1/R2 files by name
+    // (e.g. '_1'/'_2') when multiple sample pairs are collected into the same run.
     if (!is_single_end) {
-        def up_pat = params.keySet().contains('upstream_pattern') && params.upstream_pattern ? params.upstream_pattern : '_1'
-        def down_pat = params.keySet().contains('downstream_pattern') && params.downstream_pattern ? params.downstream_pattern : '_2'
+        def up_pat = params.getOrDefault('upstream_pattern', '_1')
+        def down_pat = params.getOrDefault('downstream_pattern', '_2')
         pattern_flags = "--upstream-pattern=${up_pat} --downstream-pattern=${down_pat}"
     }
 
-    // WJOB_ASYNC
-    def cloud_flag = params.cloud_folder ? "--cloud-folder=${params.cloud_folder}" : ""
 
     """
     mkdir -p ${outdir}
-    xvfb-run -a omicsbox megahit \\
+    omicsbox megahit \\
+        ${seq_flag} \\
         ${input_flag} \\
         ${pattern_flags} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
-        ${cloud_flag} \\
         ${args}
     """
 }

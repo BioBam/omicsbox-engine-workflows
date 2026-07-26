@@ -1,16 +1,14 @@
-// --- FILE: modules/go_annotation_charts.nf ---
-// Wraps: omicsbox statistics-annotation  |  backend: LEGACY_SYNC
-// Generates GO annotation distribution charts
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/go_annotation_charts.nf ---
+// Wraps: omicsbox statistics-annotation
+// Generates GO annotation distribution charts.
 
 process GO_ANNOTATION_CHARTS {
 
     input:
-    // OmicsBox Annotated Project (.box) emitted by the upstream GO_ANNOTATION step.
-    path annotated_project
+    path annotated_project   // GO-annotated OmicsBox project (.box)
 
     output:
-    path "${task.ext.outdir}/*", emit: annotation_charts
+    path "${task.ext.outdir}/annotation-distribution.${params.chart_format}", emit: annotation_chart   // Annotation distribution chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

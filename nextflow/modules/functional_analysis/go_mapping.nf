@@ -1,16 +1,14 @@
-// --- FILE: modules/go_mapping.nf ---
-// Wraps: omicsbox mapping-cloud  |  backend: LEGACY_SYNC
-// Maps sequences to Gene Ontology terms
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/go_mapping.nf ---
+// Wraps: omicsbox mapping-cloud
+// Maps sequences to Gene Ontology terms.
 
 process GO_MAPPING {
 
     input:
-    // OmicsBox BLAST Project (.box) emitted by the upstream DIAMOND_BLAST step.
-    path blasted_project
+    path blasted_project   // BLAST-annotated OmicsBox project (.box)
 
     output:
-    path "${task.ext.outdir}/*", emit: mapped_project
+    path "${task.ext.outdir}/project.box", emit: mapped_project   // GO-mapped project
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

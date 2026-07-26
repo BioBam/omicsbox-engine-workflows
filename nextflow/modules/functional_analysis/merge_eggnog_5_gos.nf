@@ -1,18 +1,16 @@
-// --- FILE: modules/merge_eggnog_5_gos.nf ---
-// Wraps: omicsbox merge-emapper5-annotations  |  backend: LEGACY_SYNC
-// Integrates EggNOG annotations with GO terms
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/merge_eggnog_5_gos.nf ---
+// Wraps: omicsbox merge-emapper5-annotations
+// Integrates EggNOG annotations with GO terms.
 
 process MERGE_EGGNOG_5_GOS {
 
     input:
-    // Integrated project (.box) from MERGE_IPS_GOS_TO_ANNOTATION and EggNOG annotations (.box) from EGGNOG_MAPPER.
-    path integrated_project
-    path eggnog_project
+    path integrated_project   // Integrated OmicsBox project (.box) with merged GO/InterPro annotations
+    path eggnog_project       // EggNOG-Mapper annotation project (.box)
 
     output:
-    path "${task.ext.outdir}/project.box",             emit: final_project
-    path "${task.ext.outdir}/merge-orthology-groups-go-annotation.${params.chart_format}", emit: merge_eggnog_chart
+    path "${task.ext.outdir}/project.box",             emit: final_project                    // Merged OmicsBox project with EggNOG-integrated GO annotations
+    path "${task.ext.outdir}/merge-orthology-groups-go-annotation.${params.chart_format}", emit: merge_eggnog_chart   // EggNOG/GO merge results chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

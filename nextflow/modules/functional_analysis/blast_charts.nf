@@ -1,16 +1,15 @@
-// --- FILE: modules/blast_charts.nf ---
-// Wraps: omicsbox statistics-blast  |  backend: WJOB_ASYNC
-// Generates visualization charts for DIAMOND BLAST results
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/blast_charts.nf ---
+// Wraps: omicsbox statistics-blast
+// Generates visualization charts for BLAST hit statistics.
 
 process BLAST_CHARTS {
 
     input:
-    // OmicsBox project (.box) with BLAST hits emitted by the upstream DIAMOND_BLAST step.
-    path blasted_project
+    path blasted_project   // OmicsBox project (.box) with BLAST hits
 
     output:
-    path "${task.ext.outdir}/*", emit: blast_charts
+    path "${task.ext.outdir}/e-value-distribution.${params.chart_format}", emit: evalue_chart          // E-value distribution chart
+    path "${task.ext.outdir}/top-hit-species-distribution.${params.chart_format}", emit: species_chart  // Top-hit species distribution chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

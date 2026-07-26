@@ -1,6 +1,7 @@
 // =============================================================================
 // FILE: de_novo_transcriptome_characterization.nf
-nextflow.enable.dsl=2
+// De Novo Transcriptome Characterization Pipeline: Preprocessing -> Assembly (Trinity) -> Clustering (CD-HIT) -> Completeness (BUSCO) -> ORF Prediction (TransDecoder) -> Functional Annotation (DIAMOND + InterProScan + EggNOG)
+// =============================================================================
 
 include { FASTQC as FASTQC_RAW    } from '../../modules/general_tools/fastqc.nf'
 include { FASTQC as FASTQC_POST   } from '../../modules/general_tools/fastqc.nf'
@@ -24,6 +25,40 @@ workflow {
     main:
 
     // -------------------------------------------------------------------------
+    // Config template export: --dump_config copies this workflow's .config to
+    // the launch directory and exits, so the user can edit it and pass it via -c.
+    // -------------------------------------------------------------------------
+    if (params.dump_config) {
+        // 1. Source: this workflow's config template (sibling of the .nf; projectDir = workflow dir under -main-script)
+        def sourceConfig = file("${moduleDir}/de_novo_transcriptome_characterization.config")
+
+        // 2. Target: the current launch directory
+        def targetConfig = file("./de_novo_transcriptome_characterization.config")
+
+        if (sourceConfig.exists()) {
+            // 3. Physically copy the file to the user's environment
+            sourceConfig.copyTo(targetConfig)
+
+            log.info "========================================================================="
+            log.info "  [OK] Configuration template successfully exported!"
+            log.info "========================================================================="
+            log.info "  File generated at: ./de_novo_transcriptome_characterization.config"
+            log.info ""
+            log.info "  Instructions:"
+            log.info "  1. Open and modify the parameters in the generated file as needed."
+            log.info "  2. Run the actual pipeline pointing to your local configuration using:"
+            log.info "     -c de_novo_transcriptome_characterization.config"
+            log.info "========================================================================="
+        } else {
+            log.error "  [ERROR] Could not find the internal template at: ${sourceConfig}"
+        }
+
+        // 4. Stop Nextflow safely with exit code 0 (success)
+        exit 0
+    }
+
+
+    // -------------------------------------------------------------------------
     // Safety checks
     // -------------------------------------------------------------------------
     if (!params.input_paired_end && !params.input_single_end) {
@@ -42,7 +77,7 @@ workflow {
         ? channel.fromPath(params.input_single_end, checkIfExists: true).collect()
         : channel.fromPath(params.input_paired_end, checkIfExists: true).collect()
 
-    // Optional file inputs — channel.value([]) acts as a safe empty placeholder
+    // Optional file inputs - channel.value([]) acts as a safe empty placeholder
     def ch_trimmomatic_adapters = params.trimmomatic.adapters
         ? channel.fromPath(params.trimmomatic.adapters, checkIfExists: true)
         : channel.value([])
@@ -56,37 +91,37 @@ workflow {
         : channel.value([])
 
     // -------------------------------------------------------------------------
-    // 01 — Raw QC  (isolated: outputs are NOT connected downstream)
+    // 01 - Raw QC  (isolated: outputs are NOT connected downstream)
     // -------------------------------------------------------------------------
     FASTQC_RAW(ch_reads, ch_fastqc_adapters, ch_fastqc_contaminants)
 
     // -------------------------------------------------------------------------
-    // 02 — Preprocessing
+    // 02 - Preprocessing
     // -------------------------------------------------------------------------
     TRIMMOMATIC(ch_reads, ch_trimmomatic_adapters)
 
     // -------------------------------------------------------------------------
-    // 03 — Post-trim QC  (isolated: outputs are NOT connected downstream)
+    // 03 - Post-trim QC  (isolated: outputs are NOT connected downstream)
     // -------------------------------------------------------------------------
     FASTQC_POST(TRIMMOMATIC.out.trimmed_reads, ch_fastqc_adapters, ch_fastqc_contaminants)
 
     // -------------------------------------------------------------------------
-    // 04 — De-novo transcriptome assembly
+    // 04 - De-novo transcriptome assembly
     // -------------------------------------------------------------------------
     TRINITY(TRIMMOMATIC.out.trimmed_reads)
 
     // -------------------------------------------------------------------------
-    // 05 — Sequence clustering
+    // 05 - Sequence clustering
     // -------------------------------------------------------------------------
     CDHIT(TRINITY.out.assembly)
 
     // -------------------------------------------------------------------------
-    // 06 — Assembly completeness assessment  
+    // 06 - Assembly completeness assessment
     // -------------------------------------------------------------------------
     BUSCO(CDHIT.out.clustered_fasta)
 
     // -------------------------------------------------------------------------
-    // 07 — Predict protein-coding regions (ORFs) from clustered transcripts
+    // 07 - Predict protein-coding regions (ORFs) from clustered transcripts
     // CRITICAL: TRANSDECODER requires TWO inputs:
     //   - Input 1: Clustered FASTA from CDHIT
     //   - Input 2: Gene-to-transcript mapping from TRINITY
@@ -94,12 +129,12 @@ workflow {
     TRANSDECODER(CDHIT.out.clustered_fasta, TRINITY.out.gene_trans_map)
 
     // -------------------------------------------------------------------------
-    // 08 — Load predicted protein sequences into OmicsBox project for annotation
+    // 08 - Load predicted protein sequences into OmicsBox project for annotation
     // -------------------------------------------------------------------------
     LOAD_FASTA(TRANSDECODER.out.predicted_proteins)
 
     // -------------------------------------------------------------------------
-    // 09-11 — Functional annotation 
+    // 09-11 - Functional annotation
     // -------------------------------------------------------------------------
     DIAMOND_BLAST(LOAD_FASTA.out.fasta_project)
     BLAST_CHARTS(DIAMOND_BLAST.out.blasted_project)
@@ -108,12 +143,12 @@ workflow {
     EGGNOG_MAPPER(TRANSDECODER.out.predicted_proteins)
 
     // -------------------------------------------------------------------------
-    // 12 — Merge Diamond and InterProScan results
+    // 12 - Merge Diamond and InterProScan results
     // -------------------------------------------------------------------------
     COMBINE_PROJECTS(DIAMOND_BLAST.out.blasted_project, INTERPROSCAN.out.ips_project)
 
     // -------------------------------------------------------------------------
-    // 13 — Final integrated functional annotation (Diamond + InterPro + EggNOG)
+    // 13 - Final integrated functional annotation (Diamond + InterPro + EggNOG)
     // -------------------------------------------------------------------------
     MERGE_EGGNOG_5_GOS(COMBINE_PROJECTS.out.combined_project, EGGNOG_MAPPER.out.eggnog_project)
 }

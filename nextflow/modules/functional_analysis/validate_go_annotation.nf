@@ -1,16 +1,14 @@
-// --- FILE: modules/validate_go_annotation.nf ---
-// Wraps: omicsbox annotation-validate  |  backend: LEGACY_SYNC
-// Validates GO annotations using True-Path-Rule
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/validate_go_annotation.nf ---
+// Wraps: omicsbox annotation-validate
+// Validates GO annotations using True-Path-Rule.
 
 process VALIDATE_GO_ANNOTATION {
 
     input:
-    // Integrated OmicsBox project (.box) emitted by the upstream MERGE_IPS_GOS_TO_ANNOTATION step.
-    path final_project
+    path final_project   // Merged OmicsBox project (.box) with combined GO annotations
 
     output:
-    path "${task.ext.outdir}/*", emit: validated_project
+    path "${task.ext.outdir}/project.box", emit: validated_project   // Validated GO-annotation project
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

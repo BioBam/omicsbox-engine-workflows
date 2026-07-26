@@ -1,38 +1,33 @@
-// --- FILE: modules/augustus.nf ---
-// Wraps: omicsbox genefinding-eukaryotic  |  backend: LEGACY_SYNC
+// --- FILE: modules/genome_analysis/augustus.nf ---
+// Wraps: omicsbox genefinding-eukaryotic
 // Eukaryotic gene finding using AUGUSTUS with evidence-based prediction.
-nextflow.enable.dsl=2
 
 process AUGUSTUS {
 
     input:
     path fasta                      // Soft-masked genome FASTA file
-    path hint_est, optional: true   // Optional: EST/cDNA hint files (evidence for gene prediction)
-    path hint_protein, optional: true  // Optional: Protein hint files (evidence for gene prediction)
-    path hint_isoseq, optional: true   // Optional: IsoSeq hint files (evidence)
-    path hint_rna_se, optional: true   // Optional: RNA-Seq single-end hint files
-    path hint_rna_ds, optional: true   // Optional: RNA-Seq paired-end hint files
+    path hint_est   // Optional: EST/cDNA hint files
+    path hint_protein  // Optional: Protein hint files
+    path hint_isoseq   // Optional: IsoSeq hint files
+    path hint_rna_se   // Optional: RNA-Seq single-end hint files
+    path hint_rna_ds   // Optional: RNA-Seq paired-end hint files
 
     output:
-    path "${task.ext.outdir}/*.gff", emit: gff_genes                 // Predicted genes in GFF format
-    path "${task.ext.outdir}/*cds*project*", emit: cds_project               // OmicsBox CDS project with predictions
-    path "${task.ext.outdir}/*protein*project*", emit: protein_project         // OmicsBox protein project with predictions
-    path "${task.ext.outdir}/*report*.box", emit: report             // OmicsBox report
-    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart               // OmicsBox chart
-    
+    path "${task.ext.outdir}/*protein*egf*.box", emit: protein_project            // Predicted proteins project
+    path "${task.ext.outdir}/*cds*egf*.box", emit: cds_project                    // Predicted CDS project
+    path "${task.ext.outdir}/*gff*egf*.box", emit: gff_genes                      // Predicted genes (GFF exported as .box)
+    path "${task.ext.outdir}/*report*.box", emit: report                          // Augustus report
+    path "${task.ext.outdir}/*distribution*.${params.chart_format}", emit: chart  // CDS-length distribution chart
+
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
     def args = task.ext.args ?: ''
 
-    // =====================================================================
-    // DYNAMIC: Read gene finding mode
-    // =====================================================================
     def mode = params.augustus.gene_finding_mode ?: 'abinitio'
     def mode_flag = "--gene-finding-mode=${mode}"
 
-    // =====================================================================
-    // DYNAMIC: Optional evidence hints
-    // =====================================================================
+    // Optional-input convention: unwired hint channels arrive as an empty List
+    // (channel.value([])) rather than a real path - that's the "not provided" case to skip.
     def has_est = hint_est ? hint_est.toString() != '[]' : false
     def has_protein = hint_protein ? hint_protein.toString() != '[]' : false
     def has_isoseq = hint_isoseq ? hint_isoseq.toString() != '[]' : false
@@ -55,7 +50,6 @@ process AUGUSTUS {
         ? "--i-hint-files-rna-seq-d=${hint_rna_ds instanceof List ? hint_rna_ds.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${hint_rna_ds}"}"
         : ""
 
-    // LEGACY_SYNC
 
     """
     mkdir -p ${outdir}

@@ -1,36 +1,36 @@
-// --- FILE: modules/transdecoder.nf ---
-// Wraps: omicsbox transdecoder  |  backend: WJOB_ASYNC
-// Predicts protein-coding regions (ORFs) from assembled transcripts.
-nextflow.enable.dsl=2
+// --- FILE: modules/transcriptomics/transdecoder.nf ---
+// Wraps: omicsbox transdecoder
+// Predicts protein-coding regions (ORFs) in assembled transcripts.
 
 process TRANSDECODER {
 
     input:
-    path input_fasta        // Transcript FASTA (from TRINITY or CDHIT)
-    path gene_trans_map     // Gene-to-transcript mapping file
+    path fasta                  // Assembled/clustered transcripts FASTA
+    path gene_trans_map          // Optional: transcript-to-gene ID map
 
     output:
-    path "${task.ext.outdir}/protein-output.fasta", emit: predicted_proteins
-    path "${task.ext.outdir}/cds-output.fasta", emit: predicted_cds
-    path "${task.ext.outdir}/output-gff.gff", emit: gff_annotation
-    path "${task.ext.outdir}/transdecoder_report.box", emit: report
-    path "${task.ext.outdir}/transdecoder_chart.box", emit: chart
+    path "${task.ext.outdir}/protein-output.fasta", emit: predicted_proteins  // Predicted proteins FASTA
+    path "${task.ext.outdir}/cds-output.fasta", emit: predicted_cds           // Predicted CDS FASTA
+    path "${task.ext.outdir}/output-gff.gff", emit: gff                       // Predicted ORFs in GFF
+    path "${task.ext.outdir}/*report*.box", emit: report                      // TransDecoder report
+    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart     // TransDecoder chart
 
     script:
-    def outdir     = task.ext.outdir ?: task.process.toLowerCase()
-    def args       = task.ext.args   ?: ''
+    def outdir = task.ext.outdir ?: task.process.toLowerCase()
+    def args = task.ext.args ?: ''
 
-    // WJOB_ASYNC
-    def cloud_flag = params.cloud_folder ? "--cloud-folder=${params.cloud_folder}" : ""
+    // Optional-input convention: when no gene-trans-map file is wired in, the workflow passes an
+    // empty List (channel.value([])) instead of a real path - that's the "not provided" case to skip.
+    def gene_trans_map_flag = (!(gene_trans_map instanceof List) || !gene_trans_map.isEmpty())
+        ? "--provide-gene-trans-map=true --i-gene-trans-map=\$PWD/${gene_trans_map}"
+        : "--provide-gene-trans-map=false"
 
     """
     mkdir -p ${outdir}
     omicsbox transdecoder \\
-        --i-input=\$PWD/${input_fasta} \\
-        --i-gene-trans-map=\$PWD/${gene_trans_map} \\
-        --provide-gene-trans-map=true \\
+        --i-input=\$PWD/${fasta} \\
+        ${gene_trans_map_flag} \\
         --local-folder=\$PWD/${outdir} \\
-        ${cloud_flag} \\
         ${args}
     """
 }

@@ -1,7 +1,6 @@
-// --- FILE: modules/longqc.nf ---
-// Wraps: omicsbox longqc  |  backend: LEGACY_SYNC
+// --- FILE: modules/general_tools/longqc.nf ---
+// Wraps: omicsbox longqc
 // Quality control and trimming for long-read sequencing data.
-nextflow.enable.dsl=2
 
 process LONGQC {
 
@@ -9,8 +8,9 @@ process LONGQC {
     path reads                      // Long reads (List of FASTQ/FASTA files)
 
     output:
-    path "${task.ext.outdir}/*trimmed*", emit: trimmed_reads          // Trimmed/filtered long reads
+    path "${task.ext.outdir}/*results*.box", emit: results            // LongQC results object (QC + read stats)
     path "${task.ext.outdir}/*report*.box", emit: report              // OmicsBox QC report
+    path "${task.ext.outdir}/*trimmed*", emit: trimmed_reads, optional: true  // Trimmed/filtered long reads (only if --output-trimmed=true produces them)
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
@@ -20,13 +20,11 @@ process LONGQC {
         ? reads.collect { file -> "\$PWD/${file}" }.join(',')
         : "\$PWD/${reads}"
 
-    // LEGACY_SYNC
 
     """
     mkdir -p ${outdir}
     omicsbox longqc \\
         --i-reads=${reads_list} \\
-        --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

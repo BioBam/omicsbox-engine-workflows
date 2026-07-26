@@ -1,16 +1,14 @@
-// --- FILE: modules/ec_code_mapping.nf ---
-// Wraps: omicsbox enzymecode  |  backend: LEGACY_SYNC
-// Maps Enzyme Commission codes from GO annotations
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/ec_code_mapping.nf ---
+// Wraps: omicsbox enzymecode
+// Maps Enzyme Commission codes from GO annotations.
 
 process EC_CODE_MAPPING {
 
     input:
-    // Validated OmicsBox project (.box) emitted by the upstream VALIDATE_GO_ANNOTATION step.
-    path validated_project
+    path validated_project   // GO-annotated OmicsBox project (.box)
 
     output:
-    path "${task.ext.outdir}/*", emit: ec_mapped_project
+    path "${task.ext.outdir}/project.box", emit: ec_mapped_project   // EC-code-mapped project
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

@@ -1,16 +1,14 @@
-// --- FILE: modules/export_genesets.nf ---
-// Wraps: omicsbox export-genesets  |  backend: LEGACY_SYNC
-// Exports annotated gene sets to standard formats
-nextflow.enable.dsl=2
+// --- FILE: modules/export_annotations/export_genesets.nf ---
+// Wraps: omicsbox export-genesets
+// Exports annotated gene sets to standard formats.
 
 process EXPORT_GENE_SETS {
 
     input:
-    // OmicsBox EC-mapped project (.box) emitted by the upstream EC_CODE_MAPPING step.
-    path project_file
+    path project_file   // OmicsBox project (.box) with EC-mapped annotations
 
     output:
-    path "${task.ext.outdir}/*", emit: genesets_file
+    path "${task.ext.outdir}/*", emit: genesets_file   // Exported gene sets in the selected output format
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

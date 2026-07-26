@@ -1,16 +1,14 @@
-// --- FILE: modules/go_annotation.nf ---
-// Wraps: omicsbox annotation  |  backend: WJOB_ASYNC
-// BLAST2GO functional annotation
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/go_annotation.nf ---
+// Wraps: omicsbox annotation
+// BLAST2GO functional annotation.
 
 process GO_ANNOTATION {
 
     input:
-    // OmicsBox GO Mapped Project (.box) emitted by the upstream GO_MAPPING step.
-    path mapped_project
+    path mapped_project   // GO-mapped OmicsBox project (.box)
 
     output:
-    path "${task.ext.outdir}/*", emit: annotated_project
+    path "${task.ext.outdir}/project.box", emit: annotated_project   // GO-annotated project
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

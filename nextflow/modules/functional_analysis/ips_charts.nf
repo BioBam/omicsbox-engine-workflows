@@ -1,16 +1,15 @@
-// --- FILE: modules/ips_charts.nf ---
-// Wraps: omicsbox statistics-interpro  |  backend: LEGACY_SYNC
-// Generates InterProScan domain distribution charts
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/ips_charts.nf ---
+// Wraps: omicsbox statistics-interpro
+// Generates InterProScan domain distribution charts.
 
 process IPS_CHARTS {
 
     input:
-    // OmicsBox IPS Project (.box) emitted by the upstream INTERPROSCAN step.
-    path ips_project
+    path ips_project   // OmicsBox IPS Project (.box)
 
     output:
-    path "${task.ext.outdir}/*", emit: ips_charts
+    path "${task.ext.outdir}/interproscan-families-distribution.${params.chart_format}", emit: families_chart  // InterPro families distribution chart
+    path "${task.ext.outdir}/interproscan-results.${params.chart_format}", emit: results_chart                 // InterProScan results chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

@@ -1,16 +1,15 @@
-// --- FILE: modules/go_mapping_charts.nf ---
-// Wraps: omicsbox statistics-mapping  |  backend: LEGACY_SYNC
-// Generates GO mapping distribution charts
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/go_mapping_charts.nf ---
+// Wraps: omicsbox statistics-mapping
+// Generates GO mapping distribution charts.
 
 process GO_MAPPING_CHARTS {
 
     input:
-    // OmicsBox GO Mapped Project (.box) emitted by the upstream GO_MAPPING step.
-    path mapped_project
+    path mapped_project   // GO-mapped OmicsBox project (.box)
 
     output:
-    path "${task.ext.outdir}/*", emit: mapping_charts
+    path "${task.ext.outdir}/evidence-code-distribution-for-sequences.${params.chart_format}", emit: evidence_chart  // Evidence-code distribution chart
+    path "${task.ext.outdir}/go-mapping-distribution.${params.chart_format}", emit: mapping_chart                    // GO-mapping distribution chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

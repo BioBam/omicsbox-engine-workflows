@@ -1,16 +1,14 @@
-// --- FILE: modules/project_charts.nf ---
-// Wraps: omicsbox statistics-project  |  backend: LEGACY_SYNC
-// Generates overall project statistics charts
-nextflow.enable.dsl=2
+// --- FILE: modules/functional_analysis/project_charts.nf ---
+// Wraps: omicsbox statistics-project
+// Generates overall project statistics charts.
 
 process PROJECT_CHARTS {
 
     input:
-    // OmicsBox EC-mapped project (.box) emitted by the upstream EC_CODE_MAPPING step.
-    path validated_project
+    path validated_project   // Validated OmicsBox project (.box)
 
     output:
-    path "${task.ext.outdir}/*", emit: project_charts
+    path "${task.ext.outdir}/*.${params.chart_format}", emit: project_charts   // Final annotation charts (extension follows chart_format)
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

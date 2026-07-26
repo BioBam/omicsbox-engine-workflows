@@ -1,7 +1,6 @@
-// --- FILE: modules/trimmomatic.nf ---
-// Wraps: omicsbox trimmomatic  |  backend: WJOB_ASYNC
+// --- FILE: modules/general_tools/trimmomatic.nf ---
+// Wraps: omicsbox trimmomatic
 // Adapter and quality-based read trimming.
-nextflow.enable.dsl=2
 
 process TRIMMOMATIC {
 
@@ -17,8 +16,11 @@ process TRIMMOMATIC {
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
     def args = task.ext.args ?: ''
+    // A List of files looks the same whether it's several single-end samples or paired-end
+    // mates, so the mode can't be inferred from 'reads' itself - it comes from the workflow param.
     def is_single_end = params.input_single_end ? true : false
 
+    // 'reads' is a single path for one file, or a List when the workflow .collect()s multiple samples.
     def reads_list = reads instanceof List
         ? reads.collect { file -> "\$PWD/${file}" }.join(',')
         : "\$PWD/${reads}"
@@ -29,18 +31,20 @@ process TRIMMOMATIC {
 
     def pattern_flags = ""
 
+    // Only paired-end needs these: they tell OmicsBox how to pair up R1/R2 files by name
+    // (e.g. '_1'/'_2') when multiple sample pairs are collected into the same run.
     if (!is_single_end) {
-        def up_pat = params.keySet().contains('upstream_pattern') ? params.upstream_pattern : '_1'
-        def down_pat = params.keySet().contains('downstream_pattern') ? params.downstream_pattern : '_2'
+        def up_pat = params.getOrDefault('upstream_pattern', '_1')
+        def down_pat = params.getOrDefault('downstream_pattern', '_2')
         pattern_flags = "--upstream-pattern-preprocessing=${up_pat} --downstream-pattern-preprocessing=${down_pat}"
     }
 
+    // Optional-input convention: when no adapter file is wired in, the workflow passes an empty
+    // List (channel.value([])) instead of a real path - that's the "not provided" case to skip.
     def adapter_flag = (!(adapters instanceof List) || !adapters.isEmpty())
         ? "--i-adapter-file=\$PWD/${adapters}"
         : ""
 
-    // WJOB_ASYNC
-    def cloud_flag = params.cloud_folder ? "--cloud-folder=${params.cloud_folder}" : ""
 
     """
     mkdir -p ${outdir}
@@ -48,7 +52,6 @@ process TRIMMOMATIC {
         ${input_flag} \\
         ${pattern_flags} \\
         ${adapter_flag} \\
-        ${cloud_flag} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
 

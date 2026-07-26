@@ -1,31 +1,27 @@
-// --- FILE: modules/busco.nf ---
-// Wraps: omicsbox busco  |  backend: WJOB_ASYNC
+// --- FILE: modules/genome_analysis/busco.nf ---
+// Wraps: omicsbox busco
 // Assesses assembly completeness against a BUSCO lineage database.
-nextflow.enable.dsl=2
 
 process BUSCO {
 
     input:
-    path sequences   
+    path sequences   // Assembly sequences to evaluate (FASTA)
 
     output:
-    path "${task.ext.outdir}/*.box", emit: busco_results
-    path "${task.ext.outdir}/*report*.box", emit: report        // OmicsBox report
-    path "${task.ext.outdir}/*chart*", emit: busco_chart        // BUSCO chart visualization    
+    path "${task.ext.outdir}/*project*.box", emit: busco_project           // BUSCO OmicsBox project
+    path "${task.ext.outdir}/*report*.box", emit: report                   // BUSCO completeness report
+    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart  // BUSCO chart (extension follows chart_format)
 
     script:
-    def outdir     = task.ext.outdir ?: task.process.toLowerCase()
-    def args       = task.ext.args   ?: ''
+    def outdir = task.ext.outdir ?: task.process.toLowerCase()
+    def args = task.ext.args ?: ''
 
-    // WJOB_ASYNC
-    def cloud_flag = params.cloud_folder ? "--cloud-folder=${params.cloud_folder}" : ""
 
     """
     mkdir -p ${outdir}
     omicsbox busco \\
         --i-sequences=\$PWD/${sequences} \\
         --local-folder=\$PWD/${outdir} \\
-        ${cloud_flag} \\
         ${args}
     """
 }
