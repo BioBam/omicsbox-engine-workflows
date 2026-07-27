@@ -5,7 +5,7 @@
 process AUGUSTUS {
 
     input:
-    path fasta                      // Soft-masked genome FASTA file
+    path fasta                      // Genome FASTA file (soft-masked recommended)
     path hint_est   // Optional: EST/cDNA hint files
     path hint_protein  // Optional: Protein hint files
     path hint_isoseq   // Optional: IsoSeq hint files

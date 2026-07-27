@@ -5,7 +5,7 @@
 process PROJECT_CHARTS {
 
     input:
-    path validated_project   // Validated OmicsBox project (.box)
+    path project   // OmicsBox project (.box)
 
     output:
     path "${task.ext.outdir}/*.${params.chart_format}", emit: project_charts   // Final annotation charts (extension follows chart_format)
@@ -17,7 +17,7 @@ process PROJECT_CHARTS {
     """
     mkdir -p ${outdir}
     omicsbox statistics-project \\
-        --i-project=\$PWD/${validated_project} \\
+        --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

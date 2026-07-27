@@ -5,7 +5,7 @@
 process EC_CODE_MAPPING {
 
     input:
-    path validated_project   // GO-annotated OmicsBox project (.box)
+    path project   // OmicsBox project (.box) with GO annotations
 
     output:
     path "${task.ext.outdir}/project.box", emit: ec_mapped_project   // EC-code-mapped project
@@ -17,7 +17,7 @@ process EC_CODE_MAPPING {
     """
     mkdir -p ${outdir}
     omicsbox enzymecode \\
-        --i-project=\$PWD/${validated_project} \\
+        --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

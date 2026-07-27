@@ -5,7 +5,7 @@
 process IPS_CHARTS {
 
     input:
-    path ips_project   // OmicsBox IPS Project (.box)
+    path project   // OmicsBox project (.box) with InterProScan results
 
     output:
     path "${task.ext.outdir}/interproscan-families-distribution.${params.chart_format}", emit: families_chart  // InterPro families distribution chart
@@ -18,7 +18,7 @@ process IPS_CHARTS {
     """
     mkdir -p ${outdir}
     omicsbox statistics-interpro \\
-        --i-project=\$PWD/${ips_project} \\
+        --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

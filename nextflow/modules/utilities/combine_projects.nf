@@ -5,8 +5,8 @@
 process COMBINE_PROJECTS {
 
     input:
-    path ips_project         // OmicsBox project (.box) containing InterProScan domain annotations
-    path annotated_project   // OmicsBox project (.box) containing GO functional annotations
+    path project1         // First OmicsBox project (.box) to merge (--i-project1)
+    path project2   // Second OmicsBox project (.box) to merge (--i-project2)
 
     output:
     path "${task.ext.outdir}/combined_project.box", emit: combined_project   // Merged OmicsBox project
@@ -18,8 +18,8 @@ process COMBINE_PROJECTS {
     """
     mkdir -p ${outdir}
     omicsbox combine-projects \\
-        --i-project1=\$PWD/${ips_project} \\
-        --i-project2=\$PWD/${annotated_project} \\
+        --i-project1=\$PWD/${project1} \\
+        --i-project2=\$PWD/${project2} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

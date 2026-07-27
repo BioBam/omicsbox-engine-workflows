@@ -5,7 +5,7 @@
 process EXPORT_GENE_SETS {
 
     input:
-    path project_file   // OmicsBox project (.box) with EC-mapped annotations
+    path project_file   // Annotated OmicsBox project (.box) to export
 
     output:
     path "${task.ext.outdir}/*", emit: genesets_file   // Exported gene sets in the selected output format

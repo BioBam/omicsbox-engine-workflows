@@ -5,7 +5,7 @@
 process GO_ANNOTATION {
 
     input:
-    path mapped_project   // GO-mapped OmicsBox project (.box)
+    path project   // OmicsBox project (.box) with GO mappings
 
     output:
     path "${task.ext.outdir}/project.box", emit: annotated_project   // GO-annotated project
@@ -17,7 +17,7 @@ process GO_ANNOTATION {
     """
     mkdir -p ${outdir}
     omicsbox annotation \\
-        --i-project=\$PWD/${mapped_project} \\
+        --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

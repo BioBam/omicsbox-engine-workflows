@@ -5,10 +5,10 @@
 process MERGE_IPS_GOS_TO_ANNOTATION {
 
     input:
-    path combined_project   // Combined OmicsBox project (.box)
+    path project   // OmicsBox project (.box) with InterPro domains and GO annotations
 
     output:
-    path "${task.ext.outdir}/project.box",               emit: integrated_project           // Integrated OmicsBox project (.box)
+    path "${task.ext.outdir}/project.box",               emit: merged_project           // OmicsBox project with InterPro GOs merged into the annotations
     path "${task.ext.outdir}/merge-interpro-annotation-results.${params.chart_format}",   emit: merge_chart   // InterPro/GO merge results chart
 
     script:
@@ -18,7 +18,7 @@ process MERGE_IPS_GOS_TO_ANNOTATION {
     """
     mkdir -p ${outdir}
     omicsbox interproscan-join \\
-        --i-project=\$PWD/${combined_project} \\
+        --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

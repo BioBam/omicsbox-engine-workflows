@@ -5,7 +5,7 @@
 process VALIDATE_GO_ANNOTATION {
 
     input:
-    path final_project   // Merged OmicsBox project (.box) with combined GO annotations
+    path project   // OmicsBox project (.box) with GO annotations
 
     output:
     path "${task.ext.outdir}/project.box", emit: validated_project   // Validated GO-annotation project
@@ -17,7 +17,7 @@ process VALIDATE_GO_ANNOTATION {
     """
     mkdir -p ${outdir}
     omicsbox annotation-validate \\
-        --i-project=\$PWD/${final_project} \\
+        --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

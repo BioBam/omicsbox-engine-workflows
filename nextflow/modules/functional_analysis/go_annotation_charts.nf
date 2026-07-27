@@ -5,7 +5,7 @@
 process GO_ANNOTATION_CHARTS {
 
     input:
-    path annotated_project   // GO-annotated OmicsBox project (.box)
+    path project   // OmicsBox project (.box) with GO annotations
 
     output:
     path "${task.ext.outdir}/annotation-distribution.${params.chart_format}", emit: annotation_chart   // Annotation distribution chart
@@ -17,7 +17,7 @@ process GO_ANNOTATION_CHARTS {
     """
     mkdir -p ${outdir}
     omicsbox statistics-annotation \\
-        --i-project=\$PWD/${annotated_project} \\
+        --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

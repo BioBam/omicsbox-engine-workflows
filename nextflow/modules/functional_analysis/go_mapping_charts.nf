@@ -5,7 +5,7 @@
 process GO_MAPPING_CHARTS {
 
     input:
-    path mapped_project   // GO-mapped OmicsBox project (.box)
+    path project   // OmicsBox project (.box) with GO mappings
 
     output:
     path "${task.ext.outdir}/evidence-code-distribution-for-sequences.${params.chart_format}", emit: evidence_chart  // Evidence-code distribution chart
@@ -18,7 +18,7 @@ process GO_MAPPING_CHARTS {
     """
     mkdir -p ${outdir}
     omicsbox statistics-mapping \\
-        --i-project=\$PWD/${mapped_project} \\
+        --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

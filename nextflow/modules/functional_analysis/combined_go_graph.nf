@@ -5,7 +5,7 @@
 process COMBINED_GO_GRAPH {
 
     input:
-    path validated_project   // EC-mapped OmicsBox project (.box)
+    path project   // OmicsBox project (.box) with GO annotations
 
     output:
     path "${task.ext.outdir}/graph*.${params.chart_format}", emit: go_graphs   // Combined GO graph chart(s)
@@ -17,7 +17,7 @@ process COMBINED_GO_GRAPH {
     """
     mkdir -p ${outdir}
     omicsbox graph-combined-make \\
-        --i-project=\$PWD/${validated_project} \\
+        --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

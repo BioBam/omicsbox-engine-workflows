@@ -5,7 +5,7 @@
 process BLAST_CHARTS {
 
     input:
-    path blasted_project   // OmicsBox project (.box) with BLAST hits
+    path project   // OmicsBox project (.box) with BLAST hits
 
     output:
     path "${task.ext.outdir}/e-value-distribution.${params.chart_format}", emit: evalue_chart          // E-value distribution chart
@@ -18,7 +18,7 @@ process BLAST_CHARTS {
     """
     mkdir -p ${outdir}
     omicsbox statistics-blast \\
-        --i-project=\$PWD/${blasted_project} \\
+        --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

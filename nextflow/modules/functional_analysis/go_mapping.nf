@@ -5,7 +5,7 @@
 process GO_MAPPING {
 
     input:
-    path blasted_project   // BLAST-annotated OmicsBox project (.box)
+    path project   // OmicsBox project (.box) with BLAST hits
 
     output:
     path "${task.ext.outdir}/project.box", emit: mapped_project   // GO-mapped project
@@ -17,7 +17,7 @@ process GO_MAPPING {
     """
     mkdir -p ${outdir}
     omicsbox mapping-cloud \\
-        --i-project=\$PWD/${blasted_project} \\
+        --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

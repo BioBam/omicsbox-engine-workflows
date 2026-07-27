@@ -117,17 +117,18 @@ workflow {
     // -------------------------------------------------------------------------
     COMBINE_PROJECTS(GO_ANNOTATION.out.annotated_project, INTERPROSCAN.out.ips_project)
     MERGE_IPS_GOS_TO_ANNOTATION(COMBINE_PROJECTS.out.combined_project)
-    MERGE_EGGNOG_5_GOS(MERGE_IPS_GOS_TO_ANNOTATION.out.integrated_project, EGGNOG_MAPPER.out.eggnog_project)
+    MERGE_EGGNOG_5_GOS(MERGE_IPS_GOS_TO_ANNOTATION.out.merged_project, EGGNOG_MAPPER.out.eggnog_project)
 
     // -------------------------------------------------------------------------
     // 10-13 - Final curation, enzyme mapping & comprehensive reporting
     // All downstream processes consume the unified, fully-annotated master project
     // -------------------------------------------------------------------------
-    VALIDATE_GO_ANNOTATION(MERGE_EGGNOG_5_GOS.out.final_project)
+    VALIDATE_GO_ANNOTATION(MERGE_EGGNOG_5_GOS.out.merged_project)
     EC_CODE_MAPPING(VALIDATE_GO_ANNOTATION.out.validated_project)
     FINAL_ANNOTATION_CHARTS(EC_CODE_MAPPING.out.ec_mapped_project)
+    PROJECT_CHARTS(EC_CODE_MAPPING.out.ec_mapped_project)
     COMBINED_GO_GRAPH(EC_CODE_MAPPING.out.ec_mapped_project)
     EXPORT_GENE_SETS(EC_CODE_MAPPING.out.ec_mapped_project)
     GO_SLIM(EC_CODE_MAPPING.out.ec_mapped_project, ch_goslim_obo)
-    GOSLIM_ANNOTATION_CHARTS(GO_SLIM.out.goslim_project)
+    GOSLIM_ANNOTATION_CHARTS(GO_SLIM.out.project)
 }

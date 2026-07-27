@@ -6,7 +6,7 @@ process RSEM {
 
     input:
     path reads             // Input FASTQ reads (single-end or paired-end)
-    path assembly          // Trinity-format assembly FASTA
+    path assembly          // Reference transcriptome assembly FASTA
     path gene_trans_map    // Optional: gene-to-transcript map
 
     output:

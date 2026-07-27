@@ -5,11 +5,11 @@
 process GO_SLIM {
 
     input:
-    path project_file   // EC-mapped OmicsBox project (.box)
+    path project_file   // Annotated OmicsBox project (.box)
     path obo_file       // Optional: custom GO-Slim OBO file
 
     output:
-    path "${task.ext.outdir}/*", emit: goslim_project   // GO-Slim annotated project
+    path "${task.ext.outdir}/*", emit: project   // GO-Slim annotated project
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

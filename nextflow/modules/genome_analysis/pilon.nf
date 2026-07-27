@@ -5,7 +5,7 @@
 process PILON {
 
     input:
-    path assembly               // Unpolished long-read assembly (FASTA)
+    path assembly               // Assembly FASTA to polish
     path bam_file               // Sorted BAM alignment file
 
     output:

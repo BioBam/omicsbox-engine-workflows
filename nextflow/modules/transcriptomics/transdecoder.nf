@@ -5,7 +5,7 @@
 process TRANSDECODER {
 
     input:
-    path fasta                  // Assembled/clustered transcripts FASTA
+    path fasta                  // Transcript sequences FASTA
     path gene_trans_map          // Optional: transcript-to-gene ID map
 
     output:
