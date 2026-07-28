@@ -74,6 +74,16 @@ workflow {
     }
 
     // -------------------------------------------------------------------------
+    // STRICT VALIDATION: QUAST Reference Genome
+    // QUAST always passes --i-reference, so the file is required even though it
+    // feeds a single step. Without this guard, fromPath(null) aborts the run with
+    // "Missing `fromPath` parameter", which names neither the step nor the param.
+    // -------------------------------------------------------------------------
+    if (!params.quast.reference_genome) {
+        exit 1, "ERROR: QUAST requires a reference genome via params.quast.reference_genome."
+    }
+
+    // -------------------------------------------------------------------------
     // Channel creation
     // ARCHITECTURAL NOTE: .collect() gathers all reads into a single List so that
     // only ONE OmicsBox task is spawned. OmicsBox parallelises internally over samples.

@@ -11,8 +11,8 @@ process BWA {
     output:
     path "${task.ext.outdir}/*.bam", emit: sorted_bam                              // Coordinate-sorted BAM alignment file
     path "${task.ext.outdir}/*report*.box", emit: report                          // BWA report
-    path "${task.ext.outdir}/*chart_abs*.${params.chart_format}", emit: chart_abs  // Absolute-value chart
-    path "${task.ext.outdir}/*chart_rel*.${params.chart_format}", emit: chart_rel  // Relative-value chart
+    path "${task.ext.outdir}/*chart_abs*.box", emit: chart_abs  // Absolute-value chart
+    path "${task.ext.outdir}/*chart_rel*.box", emit: chart_rel  // Relative-value chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

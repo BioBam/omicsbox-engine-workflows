@@ -11,7 +11,7 @@ process QUAST {
     output:
     path "${task.ext.outdir}/*results*.box", emit: results                 // QUAST results project
     path "${task.ext.outdir}/*report*.box", emit: report                   // QUAST report
-    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart  // QUAST chart
+    path "${task.ext.outdir}/*chart*.box", emit: chart  // QUAST chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

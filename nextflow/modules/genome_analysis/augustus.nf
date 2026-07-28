@@ -9,8 +9,13 @@ process AUGUSTUS {
     path hint_est   // Optional: EST/cDNA hint files
     path hint_protein  // Optional: Protein hint files
     path hint_isoseq   // Optional: IsoSeq hint files
-    path hint_rna_se   // Optional: RNA-Seq single-end hint files
-    path hint_rna_ds   // Optional: RNA-Seq paired-end hint files
+    // OmicsBox splits RNA-Seq evidence into two SLOTS, not into two library layouts:
+    //   rna-seq-u ("RNA SE/US") = a Single-End library, OR the Upstream mate of a Paired-End one
+    //   rna-seq-d ("RNA DS")    = the Downstream mate of that Paired-End library
+    // Paired-End RNA-Seq therefore fills BOTH slots, one mate each; a downstream mate on
+    // its own is not a valid input. One file per slot.
+    path hint_rna_us   // Optional: RNA-Seq single-end or upstream hint file
+    path hint_rna_ds   // Optional: RNA-Seq downstream hint file (paired-end only)
 
     output:
     path "${task.ext.outdir}/*protein*egf*.box", emit: protein_project            // Predicted proteins project
@@ -31,7 +36,7 @@ process AUGUSTUS {
     def has_est = hint_est ? hint_est.toString() != '[]' : false
     def has_protein = hint_protein ? hint_protein.toString() != '[]' : false
     def has_isoseq = hint_isoseq ? hint_isoseq.toString() != '[]' : false
-    def has_rna_se = hint_rna_se ? hint_rna_se.toString() != '[]' : false
+    def has_rna_us = hint_rna_us ? hint_rna_us.toString() != '[]' : false
     def has_rna_ds = hint_rna_ds ? hint_rna_ds.toString() != '[]' : false
 
     def est_flag = has_est
@@ -43,8 +48,8 @@ process AUGUSTUS {
     def isoseq_flag = has_isoseq
         ? "--i-hint-files-isoseq=${hint_isoseq instanceof List ? hint_isoseq.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${hint_isoseq}"}"
         : ""
-    def rna_se_flag = has_rna_se
-        ? "--i-hint-files-rna-seq-u=${hint_rna_se instanceof List ? hint_rna_se.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${hint_rna_se}"}"
+    def rna_us_flag = has_rna_us
+        ? "--i-hint-files-rna-seq-u=${hint_rna_us instanceof List ? hint_rna_us.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${hint_rna_us}"}"
         : ""
     def rna_ds_flag = has_rna_ds
         ? "--i-hint-files-rna-seq-d=${hint_rna_ds instanceof List ? hint_rna_ds.collect { file -> "\$PWD/${file}" }.join(',') : "\$PWD/${hint_rna_ds}"}"
@@ -59,7 +64,7 @@ process AUGUSTUS {
         ${est_flag} \\
         ${protein_flag} \\
         ${isoseq_flag} \\
-        ${rna_se_flag} \\
+        ${rna_us_flag} \\
         ${rna_ds_flag} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

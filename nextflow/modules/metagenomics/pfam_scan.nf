@@ -1,11 +1,11 @@
 // --- FILE: modules/metagenomics/pfam_scan.nf ---
 // Wraps: omicsbox pfam-scan
-// Annotates predicted proteins with Pfam protein domains.
+// Annotates protein or nucleotide sequences with Pfam protein domains.
 
 process PFAM_SCAN {
 
     input:
-    path fasta   // Predicted protein FASTA
+    path fasta   // Input FASTA (protein or nucleotide sequences)
 
     output:
     path "${task.ext.outdir}/*Report*.box", emit: report          // Pfam-Scan report

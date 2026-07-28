@@ -8,7 +8,7 @@ process GO_ANNOTATION_CHARTS {
     path project   // OmicsBox project (.box) with GO annotations
 
     output:
-    path "${task.ext.outdir}/annotation-distribution.${params.chart_format}", emit: annotation_chart   // Annotation distribution chart
+    path "${task.ext.outdir}/*.${params.chart_format}", emit: charts, optional: true   // GO annotation distribution charts
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

@@ -13,7 +13,7 @@ process TRANSDECODER {
     path "${task.ext.outdir}/cds-output.fasta", emit: predicted_cds           // Predicted CDS FASTA
     path "${task.ext.outdir}/output-gff.gff", emit: gff                       // Predicted ORFs in GFF
     path "${task.ext.outdir}/*report*.box", emit: report                      // TransDecoder report
-    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart     // TransDecoder chart
+    path "${task.ext.outdir}/*chart*.box", emit: chart     // TransDecoder chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

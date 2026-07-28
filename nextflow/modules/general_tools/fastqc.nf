@@ -30,7 +30,7 @@ process FASTQC {
         ? "--provide-adapters=true --i-adapters=\$PWD/${adapters}"
         : ""
 
-    def contaminants_flag = (contaminants instanceof List && !contaminants.isEmpty())
+    def contaminants_flag = (!(contaminants instanceof List) || !contaminants.isEmpty())
         ? "--provide-contaminants=true --i-contaminants=\$PWD/${contaminants}"
         : ""
 

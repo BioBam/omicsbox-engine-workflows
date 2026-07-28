@@ -19,7 +19,7 @@ process ABYSS {
     path "${task.ext.outdir}/assembly-scaffolds.dot", emit: scaffolds_graph, optional: true  // Scaffold assembly graph (only if --save-graph=true)
     path "${task.ext.outdir}/assembly-contigs.dot", emit: contigs_graph, optional: true      // Contig assembly graph (only if --save-graph=true)
     path "${task.ext.outdir}/*report*.box", emit: report                     // ABySS report
-    path "${task.ext.outdir}/*chart*.${params.chart_format}", emit: chart    // ABySS chart
+    path "${task.ext.outdir}/*chart*.box", emit: chart    // ABySS chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

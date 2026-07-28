@@ -8,8 +8,7 @@ process IPS_CHARTS {
     path project   // OmicsBox project (.box) with InterProScan results
 
     output:
-    path "${task.ext.outdir}/interproscan-families-distribution.${params.chart_format}", emit: families_chart  // InterPro families distribution chart
-    path "${task.ext.outdir}/interproscan-results.${params.chart_format}", emit: results_chart                 // InterProScan results chart
+    path "${task.ext.outdir}/*.${params.chart_format}", emit: charts, optional: true   // InterProScan distribution charts
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

@@ -8,7 +8,7 @@ process COMBINED_GO_GRAPH {
     path project   // OmicsBox project (.box) with GO annotations
 
     output:
-    path "${task.ext.outdir}/graph*.${params.chart_format}", emit: go_graphs   // Combined GO graph chart(s)
+    path "${task.ext.outdir}/graph*.box", emit: go_graphs   // Combined GO graph(s)
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

@@ -97,10 +97,25 @@ workflow {
     // STRICT VALIDATION: Augustus Gene Finding Mode
     // -------------------------------------------------------------------------
     if (params.augustus.gene_finding_mode == 'ee') {
-        def has_any_hint = params.augustus.est_hints || params.augustus.protein_hints || params.augustus.isoseq_hints || params.augustus.rna_seq_se_hints || params.augustus.rna_seq_pe_hints
+        def has_any_hint = params.augustus.est_hints || params.augustus.protein_hints || params.augustus.isoseq_hints || params.augustus.rna_seq_upstream_hints || params.augustus.rna_seq_downstream_hints
         if (!has_any_hint) {
-            exit 1, "ERROR: When Augustus gene_finding_mode is 'ee' (Extrinsic Evidence), you must provide at least one hint file (est_hints, protein_hints, isoseq_hints, rna_seq_se_hints, or rna_seq_pe_hints)."
+            exit 1, "ERROR: When Augustus gene_finding_mode is 'ee' (Extrinsic Evidence), you must provide at least one hint file (est_hints, protein_hints, isoseq_hints, rna_seq_upstream_hints, or rna_seq_downstream_hints)."
         }
+        // The RNA DS slot only holds the downstream mate of a paired-end library, so it is
+        // meaningless without the upstream mate that OmicsBox pairs it with.
+        if (params.augustus.rna_seq_downstream_hints && !params.augustus.rna_seq_upstream_hints) {
+            exit 1, "ERROR: params.augustus.rna_seq_downstream_hints is the downstream (R2) mate of a paired-end RNA-Seq library and requires its upstream (R1) mate in params.augustus.rna_seq_upstream_hints. For single-end RNA-Seq, use rna_seq_upstream_hints alone."
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // STRICT VALIDATION: QUAST Reference Genome
+    // QUAST always passes --i-reference, so the file is required even though it
+    // feeds a single step. Without this guard, fromPath(null) aborts the run with
+    // "Missing `fromPath` parameter", which names neither the step nor the param.
+    // -------------------------------------------------------------------------
+    if (!params.quast.reference_genome) {
+        exit 1, "ERROR: QUAST requires a reference genome via params.quast.reference_genome."
     }
 
     // -------------------------------------------------------------------------
@@ -118,9 +133,9 @@ workflow {
         ? channel.fromPath(params.repeatmasker.database_file, checkIfExists: true)
         : channel.value([])
 
-    def ch_quast_ref = params.quast.reference_genome
-        ? channel.fromPath(params.quast.reference_genome, checkIfExists: true).first()
-        : channel.value([])
+    // Required input: the QUAST module always emits --i-reference, so there is no
+    // empty-placeholder branch here - the guard above rejects a missing value.
+    def ch_quast_ref = channel.fromPath(params.quast.reference_genome, checkIfExists: true).first()
 
     def ch_aug_est = params.augustus.est_hints
         ? channel.fromPath(params.augustus.est_hints, checkIfExists: true).collect()
@@ -134,12 +149,14 @@ workflow {
         ? channel.fromPath(params.augustus.isoseq_hints, checkIfExists: true).collect()
         : channel.value([])
 
-    def ch_aug_rna_se = params.augustus.rna_seq_se_hints
-        ? channel.fromPath(params.augustus.rna_seq_se_hints, checkIfExists: true).collect()
+    // RNA-Seq evidence fills two OmicsBox slots: the upstream one takes a single-end library
+    // or the R1 mate, the downstream one takes only the R2 mate of that same library.
+    def ch_aug_rna_us = params.augustus.rna_seq_upstream_hints
+        ? channel.fromPath(params.augustus.rna_seq_upstream_hints, checkIfExists: true).collect()
         : channel.value([])
 
-    def ch_aug_rna_ds = params.augustus.rna_seq_pe_hints
-        ? channel.fromPath(params.augustus.rna_seq_pe_hints, checkIfExists: true).collect()
+    def ch_aug_rna_ds = params.augustus.rna_seq_downstream_hints
+        ? channel.fromPath(params.augustus.rna_seq_downstream_hints, checkIfExists: true).collect()
         : channel.value([])
 
     // -------------------------------------------------------------------------
@@ -192,7 +209,7 @@ workflow {
         ch_aug_est,
         ch_aug_protein,
         ch_aug_isoseq,
-        ch_aug_rna_se,
+        ch_aug_rna_us,
         ch_aug_rna_ds
     )
 

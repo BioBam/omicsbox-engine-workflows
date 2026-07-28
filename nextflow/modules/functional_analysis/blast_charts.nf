@@ -8,8 +8,7 @@ process BLAST_CHARTS {
     path project   // OmicsBox project (.box) with BLAST hits
 
     output:
-    path "${task.ext.outdir}/e-value-distribution.${params.chart_format}", emit: evalue_chart          // E-value distribution chart
-    path "${task.ext.outdir}/top-hit-species-distribution.${params.chart_format}", emit: species_chart  // Top-hit species distribution chart
+    path "${task.ext.outdir}/*.${params.chart_format}", emit: charts, optional: true   // BLAST statistics charts
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

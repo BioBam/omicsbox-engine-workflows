@@ -9,11 +9,11 @@ process CONT_REM {
     path target_genome  // Optional: custom target genome FASTA
 
     output:
-    path "${task.ext.outdir}/un_*.fq.gz", emit: clean_reads                                  // Contaminant-free (unaligned) reads
+    path "${task.ext.outdir}/un_*.fq.gz", emit: clean_reads, optional: true                  // Contaminant-free (unaligned) reads, when result-mode includes unaligned
     path "${task.ext.outdir}/al_*.fq.gz", emit: contaminant_reads, optional: true            // Contaminant (aligned) reads, when result-mode includes aligned
     path "${task.ext.outdir}/*report*.box", emit: report                                     // Decontamination report
-    path "${task.ext.outdir}/*chart_abs*.${params.chart_format}", emit: chart_abs            // Absolute-value chart
-    path "${task.ext.outdir}/*chart_rel*.${params.chart_format}", emit: chart_rel            // Relative-value chart
+    path "${task.ext.outdir}/*chart_abs*.box", emit: chart_abs            // Absolute-value chart
+    path "${task.ext.outdir}/*chart_rel*.box", emit: chart_rel            // Relative-value chart
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
