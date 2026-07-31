@@ -8,7 +8,7 @@ process PROJECT_CHARTS {
     path project   // OmicsBox project (.box)
 
     output:
-    path "${task.ext.outdir}/*.${params.chart_format}", emit: project_charts   // Final annotation charts (extension follows chart_format)
+    path "${task.ext.outdir}/*.${params.chart_format}", emit: charts, optional: true   // Project statistics charts 
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

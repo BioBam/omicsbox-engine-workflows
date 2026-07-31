@@ -7,7 +7,8 @@ process STAR {
     input:
     path reads                // Trimmed FASTQ reads (single-end or paired-end)
     path fasta                // Reference genome FASTA file
-    path annotation           // Genome annotation in GTF/GFF format
+    path annotation           // Optional: genome annotation in GTF/GFF format. Only used to
+                               // guide splice-junction detection if params.star.provide_gff=true
 
     output:
     path "${task.ext.outdir}/*.bam", emit: bam_sorted                                    // Coordinate-sorted BAM(s), one per sample
@@ -40,6 +41,17 @@ process STAR {
         ? "--upstream-pattern=${up_pat} --downstream-pattern=${down_pat}"
         : ""
 
+    // --provide-gff and --i-annotation-file are injected TOGETHER: the CLI rejects
+    // --i-annotation-file outright when --provide-gff is not true, so the two must always agree.
+    // Optional-input convention: when no annotation is wired in, the workflow passes an
+    // empty List (channel.value([])) instead of a real path - that's the "not provided" case
+    // to skip, same as every other optional file input in this codebase.
+    def has_annotation = !(annotation instanceof List) || !annotation.isEmpty()
+    def want_gff = (params.star?.provide_gff == true)
+    def annotation_flag = (want_gff && has_annotation)
+        ? "--provide-gff=true --i-annotation-file=\$PWD/${annotation}"
+        : ""
+
 
     """
     mkdir -p ${outdir}
@@ -47,8 +59,18 @@ process STAR {
         ${input_flag} \\
         ${pattern_flags} \\
         --i-fasta-file=\$PWD/${fasta} \\
-        --i-annotation-file=\$PWD/${annotation} \\
+        ${annotation_flag} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
+
+    # HTSEQ derives its sample name by stripping ONLY the .bam extension from the alignment
+    # filename - it does not know STAR's own output-naming convention.
+    # Left as-is, every count-table sample name would carry that suffix and could never match
+    # a real experimental design file's plain sample names. Renamed here, immediately after the
+    # CLI writes them, so every downstream step sees the same name the reads started with.
+    for f in ${outdir}/*_Aligned.sortedByCoord.out.bam ${outdir}/*_Aligned.out.bam; do
+        [ -e "\$f" ] || continue
+        mv "\$f" "\$(echo "\$f" | sed -E 's/_Aligned(\\.sortedByCoord)?\\.out\\.bam\$/.bam/')"
+    done
     """
 }

@@ -15,10 +15,14 @@ process COUNTS_PCA {
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
     def args = task.ext.args ?: ''
 
-    // Optional-input convention: an unwired design file arrives as channel.value([]), which
-    // Nextflow stages as a file literally named '[]' - that's the "not provided" case to skip.
-    def design_flag = (design_file.name != '[]')
-        ? "--i-experimental-design=\$PWD/${design_file}"
+    // --design is injected HERE, paired with the file, rather than left in ext.args: the CLI
+    // rejects --i-experimental-design outright when --design=false, so the two must always agree. 
+    def use_design = (params.counts_pca?.use_design != false)
+
+    def has_design = !(design_file instanceof List) || !design_file.isEmpty()
+
+    def design_flag = (use_design && has_design)
+        ? "--design=true --i-experimental-design=\$PWD/${design_file}"
         : ""
 
     """

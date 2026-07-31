@@ -8,7 +8,7 @@ process EXPORT_GENE_SETS {
     path project_file   // Annotated OmicsBox project (.box) to export
 
     output:
-    path "${task.ext.outdir}/*", emit: genesets_file   // Exported gene sets in the selected output format
+    path "${task.ext.outdir}/file.txt", emit: genesets_file   // Exported gene sets in the selected output format
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

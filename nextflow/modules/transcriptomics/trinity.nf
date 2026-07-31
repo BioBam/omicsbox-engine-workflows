@@ -10,9 +10,12 @@ process TRINITY {
     output:
     path "${task.ext.outdir}/transcripts.fasta", emit: assembly                                   // Assembled transcripts FASTA
     path "${task.ext.outdir}/save-map-file.txt", emit: gene_trans_map                             // Gene-to-transcript map
-    path "${task.ext.outdir}/*report*.box", emit: report                                          // Trinity report
-    path "${task.ext.outdir}/supertranscripts.fasta", emit: supertranscripts, optional: true      // SuperTranscripts FASTA
-    path "${task.ext.outdir}/read_content.box", emit: read_content, optional: true                // Read-content object
+    path "${task.ext.outdir}/*assembly_report*.box", emit: report                                 // Trinity assembly report
+    path "${task.ext.outdir}/super-transcripts.fasta", emit: supertranscripts, optional: true    // SuperTranscripts FASTA
+    path "${task.ext.outdir}/super-transcripts-gff.gff", emit: supertranscripts_gff, optional: true  // SuperTranscripts GFF
+    path "${task.ext.outdir}/*read_representation_report*.box", emit: read_content, optional: true   // Read-content object
+    path "${task.ext.outdir}/trinity_relative_chart_*.box", emit: relative_chart, optional: true     // Read-representation chart, relative
+    path "${task.ext.outdir}/trinity_absolute_chart_*.box", emit: absolute_chart, optional: true     // Read-representation chart, absolute
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

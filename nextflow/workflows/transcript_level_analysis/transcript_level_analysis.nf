@@ -133,7 +133,16 @@ workflow {
         ? RSEM.out.count_table_genes
         : RSEM.out.count_table_transcripts
 
-    COUNTS_PCA(ch_counts, ch_design)
+    // The design file is MANDATORY for edgeR - it is the model - but for the PCA it is only
+    // colouring. Feeding the same mandatory channel to both left the PCA unable to express
+    // "design available, but plot without it": counts_pca pairs --design=true with the file,
+    // so the file's presence alone forced design-aware plotting. params.counts_pca.use_design
+    // gives the optional consumer its own switch, wired the same way as params.rsem.gene_level.
+    def ch_pca_design = (params.counts_pca?.use_design == false)
+        ? channel.value([])
+        : ch_design
+
+    COUNTS_PCA(ch_counts, ch_pca_design)
     EDGER(ch_counts, ch_design)
 
 }

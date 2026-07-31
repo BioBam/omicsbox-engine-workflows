@@ -156,10 +156,7 @@ workflow {
     GWAS(BEAGLE.out.phased_vcf, ch_pheno, ch_kinship, ch_covariate)
 
     // -------------------------------------------------------------------------
-    // 09 - Variant annotation: parallel branch off the FILTERED variants, not the phased VCF.
-    // CRITICAL: Beagle strips the VCF ##contig headers (and drops unplaced scaffolds), so its
-    // phased VCF no longer matches the genome and OmicsBox rejects it. The filtered VCF keeps
-    // bcftools' ##contig headers, so annotation reads from it instead.
+    // 09 - Variant annotation: parallel branch off the filtered variants.
     // -------------------------------------------------------------------------
     VARIANT_ANNOTATION(VARIANT_FILTERING.out.filtered_vcf, ch_gff, ch_reference)
 

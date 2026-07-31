@@ -12,7 +12,7 @@ process BCFTOOLS {
     output:
     path "${task.ext.outdir}/*.vcf{,.gz}", emit: vcf                        // Called variants VCF
     path "${task.ext.outdir}/*[Rr]eport*.box", emit: report                // Variant calling report
-    path "${task.ext.outdir}/*{depth,quality}*.${params.chart_format}", emit: charts   // Read-depth and mapping-quality charts
+    path "${task.ext.outdir}/*{depth,quality}*.${params.chart_format}", emit: charts, optional: true   // Read-depth and mapping-quality charts 
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

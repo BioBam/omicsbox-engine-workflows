@@ -9,7 +9,7 @@ process GO_SLIM {
     path obo_file       // Optional: custom GO-Slim OBO file
 
     output:
-    path "${task.ext.outdir}/*", emit: project   // GO-Slim annotated project
+    path "${task.ext.outdir}/project.box", emit: project   // GO-Slim annotated project
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()

@@ -10,7 +10,7 @@ process VARIANT_FILTERING {
     output:
     path "${task.ext.outdir}/*.vcf{,.gz}", emit: filtered_vcf               // Filtered variants VCF
     path "${task.ext.outdir}/*[Rr]eport*.box", emit: report                // Variant filtering report
-    path "${task.ext.outdir}/*{depth,quality,maf}*.${params.chart_format}", emit: charts   // Depth, quality, and MAF charts
+    path "${task.ext.outdir}/*{depth,quality,maf}*.${params.chart_format}", emit: charts, optional: true   // Depth, quality, and MAF charts
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
