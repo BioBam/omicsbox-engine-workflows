@@ -1,0 +1,449 @@
+# =============================================================================
+# FILE: workflows/functional_annotation/Snakefile
+# OmicsBox Functional Annotation pipeline. Each step runs one `omicsbox` command;
+# OmicsBox performs the analysis and handles parallelisation and resources.
+#
+# Architecture: one `include:` per module used (each defines a generic rule named
+# after the OmicsBox operation), then one `use rule <operation> as <step> with:`
+# per step, which instantiates that operation for this position in the pipeline.
+#
+# Wiring: each step declares the EXACT filename(s) OmicsBox writes; downstream
+# steps take their input via `rules.<step>.output.<name>` (works because the rules
+# are `include`d into one namespace - the `module` import does not expose named
+# outputs this way). Blocks are therefore in topological order.
+#
+# NOTE - the two `_step` names: with `include`, a rule and its base share one
+# namespace, so an instance cannot reuse the base rule's name. For the two
+# operations whose natural step name equals the operation name
+# (`eggnog_mapper`, `combine_projects`) the STEP is suffixed `_step`; their config
+# keys, folders and logs stay `eggnog_mapper`/`combine_projects`.
+#
+# Run (host OmicsBox on PATH):
+#   snakemake -s snakemake/workflows/functional_annotation/Snakefile \
+#             --config input_fasta=/path/to/sequences.fasta --cores 4
+# Export a config template:  snakemake -s .../Snakefile dump_config --cores 1
+# =============================================================================
+
+import os
+import yaml
+from snakemake.utils import update_config
+
+
+# -----------------------------------------------------------------------------
+# Rule library - one `include` per module used. These define the generic base
+# rules (dormant templates); the workflow instantiates them with `use rule ... as ...
+# with:` further down. `common.smk` provides the stage/join_args/logfile/require helpers.
+# Safe to place above the config/globals: the base rules reference nothing from
+# config at parse time, and the helpers are only *called* later (in `rule all` and
+# the `use rule` blocks, by when OUTDIR/config exist).
+# -----------------------------------------------------------------------------
+include: "../../modules/common.smk"
+include: "../../modules/functional_analysis/load_fasta.smk"  # rule load_sequences
+include: "../../modules/functional_analysis/diamond_blast.smk"  # rule diamond
+include: "../../modules/functional_analysis/blast_charts.smk"  # rule statistics_blast
+include: "../../modules/functional_analysis/go_mapping.smk"  # rule mapping_cloud
+include: "../../modules/functional_analysis/go_mapping_charts.smk"  # rule statistics_mapping
+include: "../../modules/functional_analysis/go_annotation.smk"  # rule annotation
+include: "../../modules/functional_analysis/go_annotation_charts.smk"  # rule statistics_annotation
+include: "../../modules/functional_analysis/ips.smk"  # rule ips
+include: "../../modules/functional_analysis/ips_charts.smk"  # rule statistics_interpro
+include: "../../modules/metagenomics/eggnog_mapper.smk"  # rule eggnog_mapper
+include: "../../modules/utilities/combine_projects.smk"  # rule combine_projects
+include: "../../modules/functional_analysis/merge_ips_gos_to_annotation.smk"  # rule interproscan_join
+include: "../../modules/functional_analysis/merge_eggnog_5_gos.smk"  # rule merge_emapper5_annotations
+include: "../../modules/functional_analysis/validate_go_annotation.smk"  # rule annotation_validate
+include: "../../modules/functional_analysis/ec_code_mapping.smk"  # rule enzymecode
+include: "../../modules/functional_analysis/combined_go_graph.smk"  # rule graph_combined_make
+include: "../../modules/functional_analysis/project_charts.smk"  # rule statistics_project
+include: "../../modules/functional_analysis/go_slim.smk"  # rule goslim
+include: "../../modules/export_annotations/export_genesets.smk"  # rule export_genesets
+
+
+# -----------------------------------------------------------------------------
+# Configuration, layered in three deep-merged levels (later layers win).
+# Precedence, low to high:
+#   1. ../../defaults.yaml  shared, author-controlled infrastructure, used by every
+#                           workflow in this repo; NOT exported by dump_config
+#   2. config.yaml          this workflow's params (the dump_config template)
+#   3. --configfile/--config user overrides at run time
+#
+# Do NOT "simplify" this to the native `configfile:` directive. `configfile:`
+# resolves its path relative to the WORKING DIRECTORY, not the Snakefile, so it
+# breaks the two execution modes we support: running `-s /path/to/Snakefile` from
+# another folder, and the no-clone remote run `-s gh:owner/repo@ref:...` (the YAML
+# files aren't in the CWD there at all). `workflow.source_path()` resolves relative
+# to the Snakefile and fetches into the source cache on remote runs, so it works in
+# both. The manual `update_config` calls are what `configfile:` would otherwise do
+# for us (deep-merge CLI overrides on top). 
+# -----------------------------------------------------------------------------
+with open(workflow.source_path("../../defaults.yaml")) as _fh:
+    _merged = yaml.safe_load(_fh)
+with open(workflow.source_path("config.yaml")) as _fh:
+    update_config(_merged, yaml.safe_load(_fh))
+update_config(_merged, config)  # --configfile + --config (already merged into `config`)
+config = _merged
+
+# -----------------------------------------------------------------------------
+# Derived globals. 
+#
+# ABSOLUTE on purpose (os.path.abspath, resolved against the launch dir): the
+# OmicsBox CLI resolves a relative output folder against ITS OWN install dir
+# (e.g. /OBC/OmicsBoxCli), not the Snakemake working dir - so a relative path
+# would silently write outputs to the wrong place and every step would fail with
+# MissingOutputException. 
+# -----------------------------------------------------------------------------
+OUTDIR = os.path.abspath(
+    os.path.join(
+        config["local_folder"], config.get("run_id") or "functional_annotation"
+    )
+)
+OMICSBOX_IMAGE = config["omicsbox_image"]
+CHART_FORMAT = config["chart_format"]
+
+# Optional custom GO-Slim OBO file (`go_slim_obo_file` in config.yaml). An empty list
+# means "no file here", so the flag is left out of the command; only meaningful when the
+# go_slim step uses `--option=custom`.
+_GOSLIM_OBO = config.get("go_slim_obo_file")
+GOSLIM_OBO = [os.path.abspath(_GOSLIM_OBO)] if _GOSLIM_OBO else []
+GOSLIM_OBO_FLAG = f'--i-go-slim-obo-file="{GOSLIM_OBO[0]}"' if GOSLIM_OBO else ""
+
+
+# Global container default 
+# Honoured only with `--sdm apptainer`; otherwise the host `omicsbox` is used.
+container: OMICSBOX_IMAGE
+
+
+# -----------------------------------------------------------------------------
+# Default target - terminal outputs (drives the whole DAG). 
+#
+# This is the switchboard: in Snakemake a step runs ONLY if its output is
+# requested.
+# -----------------------------------------------------------------------------
+rule all:
+    default_target: True
+    input:
+        stage("blast_charts"),
+        stage("go_mapping_charts"),
+        stage("blast2go_annotation_charts"),
+        stage("ips_charts"),
+        stage("final_annotation_charts"),
+        stage("combined_go_graph"),
+        stage("project_charts"),
+        os.path.join(stage("export_gene_sets"), "file.txt"),
+        os.path.join(stage("go_slim"), "project.box"),
+        stage("goslim_annotation_charts"),
+
+
+# -----------------------------------------------------------------------------
+# Wire each step (topological order, so rules.<upstream>.output resolves).
+# -----------------------------------------------------------------------------
+
+
+# 01 - Load sequences into an OmicsBox project
+use rule load_sequences as load_fasta with:
+    input:
+        # Lazy input fn: evaluated only when this rule is in the requested DAG, so
+        # `dump_config` still works with the default input_fasta=null (a static
+        # `input:` with null would abort parsing).
+        # require(): aborts with an actionable message instead of a raw TypeError
+        # when the user forgets the parameter.
+        fasta=lambda wc: os.path.abspath(
+            require("input_fasta", "path to the input multi-FASTA file")
+        ),
+    output:
+        project=os.path.join(stage("load_fasta"), "project.box"),
+    log:
+        logfile("load_fasta"),
+    params:
+        outdir=stage("load_fasta"),
+        args=join_args("load_fasta"),
+
+
+# 02 - DIAMOND BLAST (+ charts). OmicsBox writes 'diamond_output_project.box'.
+use rule diamond as diamond_blast with:
+    input:
+        project=rules.load_fasta.output.project,
+    output:
+        project=os.path.join(stage("diamond_blast"), "diamond_output_project.box"),
+    log:
+        logfile("diamond_blast"),
+    params:
+        outdir=stage("diamond_blast"),
+        args=join_args("diamond_blast"),
+
+
+use rule statistics_blast as blast_charts with:
+    input:
+        project=rules.diamond_blast.output.project,
+    output:
+        directory(stage("blast_charts")),  # chart files; extension follows chart_format
+    log:
+        logfile("blast_charts"),
+    params:
+        chart_format=CHART_FORMAT,
+        args=join_args("blast_charts"),
+
+
+# 03 - GO mapping (+ charts)
+use rule mapping_cloud as go_mapping with:
+    input:
+        project=rules.diamond_blast.output.project,
+    output:
+        project=os.path.join(stage("go_mapping"), "project.box"),
+    log:
+        logfile("go_mapping"),
+    params:
+        outdir=stage("go_mapping"),
+        args=join_args("go_mapping"),
+
+
+use rule statistics_mapping as go_mapping_charts with:
+    input:
+        project=rules.go_mapping.output.project,
+    output:
+        directory(stage("go_mapping_charts")),
+    log:
+        logfile("go_mapping_charts"),
+    params:
+        chart_format=CHART_FORMAT,
+        args=join_args("go_mapping_charts"),
+
+
+# 04 - Initial BLAST2GO annotation (+ charts)
+use rule annotation as go_annotation with:
+    input:
+        project=rules.go_mapping.output.project,
+    output:
+        project=os.path.join(stage("go_annotation"), "project.box"),
+    log:
+        logfile("go_annotation"),
+    params:
+        outdir=stage("go_annotation"),
+        args=join_args("go_annotation"),
+
+
+use rule statistics_annotation as blast2go_annotation_charts with:
+    input:
+        project=rules.go_annotation.output.project,
+    output:
+        directory(stage("blast2go_annotation_charts")),
+    log:
+        logfile("blast2go_annotation_charts"),
+    params:
+        chart_format=CHART_FORMAT,
+        args=join_args("blast2go_annotation_charts"),
+
+
+# 05 - InterProScan (+ charts). .
+use rule ips as interproscan with:
+    input:
+        project=rules.load_fasta.output.project,
+    output:
+        project=os.path.join(stage("interproscan"), "cloud_ips_output_project.box"),
+    log:
+        logfile("interproscan"),
+    params:
+        outdir=stage("interproscan"),
+        args=join_args("interproscan"),
+
+
+use rule statistics_interpro as ips_charts with:
+    input:
+        project=rules.interproscan.output.project,
+    output:
+        directory(stage("ips_charts")),
+    log:
+        logfile("ips_charts"),
+    params:
+        chart_format=CHART_FORMAT,
+        args=join_args("ips_charts"),
+
+
+# 06 - EggNOG mapper (raw FASTA). 
+use rule eggnog_mapper as eggnog_mapper_step with:
+    input:
+        # Same lazy require()+abspath pattern as load_fasta above (section 3.11).
+        fasta=lambda wc: os.path.abspath(
+            require("input_fasta", "path to the input multi-FASTA file")
+        ),
+    output:
+        annotations=os.path.join(stage("eggnog_mapper"), "eggnog_annotations.box"),
+        report=os.path.join(stage("eggnog_mapper"), "eggnog_report.box"),
+    log:
+        logfile("eggnog_mapper"),
+    params:
+        outdir=stage("eggnog_mapper"),
+        args=join_args("eggnog_mapper"),
+
+
+# 07 - Combine GO-annotation + InterProScan projects 
+use rule combine_projects as combine_projects_step with:
+    input:
+        project1=rules.go_annotation.output.project,
+        project2=rules.interproscan.output.project,
+    output:
+        project=os.path.join(stage("combine_projects"), "combined_project.box"),
+    log:
+        logfile("combine_projects"),
+    params:
+        outdir=stage("combine_projects"),
+        args=join_args("combine_projects"),
+
+
+# 08 - Merge InterPro domains into the annotation (project.box + a chart)
+use rule interproscan_join as merge_ips_gos_to_annotation with:
+    input:
+        project=rules.combine_projects_step.output.project,
+    output:
+        project=os.path.join(stage("merge_ips_gos_to_annotation"), "project.box"),
+        chart=os.path.join(
+            stage("merge_ips_gos_to_annotation"),
+            f"merge-interpro-annotation-results.{CHART_FORMAT}",
+        ),
+    log:
+        logfile("merge_ips_gos_to_annotation"),
+    params:
+        outdir=stage("merge_ips_gos_to_annotation"),
+        chart_format=CHART_FORMAT,
+        args=join_args("merge_ips_gos_to_annotation"),
+
+
+# 09 - Merge EggNOG annotations (project.box + a chart)
+use rule merge_emapper5_annotations as merge_eggnog_5_gos with:
+    input:
+        project=rules.merge_ips_gos_to_annotation.output.project,
+        eggnog=rules.eggnog_mapper_step.output.annotations,
+    output:
+        project=os.path.join(stage("merge_eggnog_5_gos"), "project.box"),
+        chart=os.path.join(
+            stage("merge_eggnog_5_gos"),
+            f"merge-orthology-groups-go-annotation.{CHART_FORMAT}",
+        ),
+    log:
+        logfile("merge_eggnog_5_gos"),
+    params:
+        outdir=stage("merge_eggnog_5_gos"),
+        chart_format=CHART_FORMAT,
+        args=join_args("merge_eggnog_5_gos"),
+
+
+# 10 - Validate GO annotation
+use rule annotation_validate as validate_go_annotation with:
+    input:
+        project=rules.merge_eggnog_5_gos.output.project,
+    output:
+        project=os.path.join(stage("validate_go_annotation"), "project.box"),
+    log:
+        logfile("validate_go_annotation"),
+    params:
+        outdir=stage("validate_go_annotation"),
+        args=join_args("validate_go_annotation"),
+
+
+# 11 - EC code mapping
+use rule enzymecode as ec_code_mapping with:
+    input:
+        project=rules.validate_go_annotation.output.project,
+    output:
+        project=os.path.join(stage("ec_code_mapping"), "project.box"),
+    log:
+        logfile("ec_code_mapping"),
+    params:
+        outdir=stage("ec_code_mapping"),
+        args=join_args("ec_code_mapping"),
+
+
+# 12 - Final annotation charts + combined GO graph
+use rule statistics_annotation as final_annotation_charts with:
+    input:
+        project=rules.ec_code_mapping.output.project,
+    output:
+        directory(stage("final_annotation_charts")),
+    log:
+        logfile("final_annotation_charts"),
+    params:
+        chart_format=CHART_FORMAT,
+        args=join_args("final_annotation_charts"),
+
+
+use rule graph_combined_make as combined_go_graph with:
+    input:
+        project=rules.ec_code_mapping.output.project,
+    output:
+        directory(stage("combined_go_graph")),  # graph.box, graph-2.box, ... (count = go-categories)
+    log:
+        logfile("combined_go_graph"),
+    params:
+        args=join_args("combined_go_graph"),
+
+
+# -----------------------------------------------------------------------------
+# 12-13 - Project charts, gene-set export and the GO-Slim branch. 
+# -----------------------------------------------------------------------------
+use rule statistics_project as project_charts with:
+    input:
+        project=rules.ec_code_mapping.output.project,
+    output:
+        directory(stage("project_charts")),
+    log:
+        logfile("project_charts"),
+    params:
+        chart_format=CHART_FORMAT,
+        args=join_args("project_charts"),
+
+
+use rule export_genesets as export_gene_sets with:
+    input:
+        project=rules.ec_code_mapping.output.project,
+    output:
+        genesets=os.path.join(stage("export_gene_sets"), "file.txt"),
+    log:
+        logfile("export_gene_sets"),
+    params:
+        outdir=stage("export_gene_sets"),
+        args=join_args("export_gene_sets"),
+
+
+use rule goslim as go_slim with:
+    input:
+        project=rules.ec_code_mapping.output.project,
+        # Optional custom GO-Slim OBO file: [] when config go_slim.obo_file is null
+        # (the flag is then omitted), else the single tracked OBO path.
+        obo=GOSLIM_OBO,
+    output:
+        project=os.path.join(stage("go_slim"), "project.box"),
+    log:
+        logfile("go_slim"),
+    params:
+        outdir=stage("go_slim"),
+        obo_flag=GOSLIM_OBO_FLAG,
+        args=join_args("go_slim"),
+
+
+use rule statistics_annotation as goslim_annotation_charts with:
+    input:
+        project=rules.go_slim.output.project,
+    output:
+        directory(stage("goslim_annotation_charts")),
+    log:
+        logfile("goslim_annotation_charts"),
+    params:
+        chart_format=CHART_FORMAT,
+        args=join_args("goslim_annotation_charts"),
+
+
+# -----------------------------------------------------------------------------
+# Config template export.
+#   snakemake -s .../Snakefile dump_config --cores 1
+# -----------------------------------------------------------------------------
+rule dump_config:
+    output:
+        "functional_annotation.config.yaml",
+    log:
+        logfile("dump_config"),
+    params:
+        src=workflow.source_path("config.yaml"),
+    shell:
+        "cp {params.src} {output} 2> {log} && "
+        'echo "[OK] Template exported to {output} - edit it and run with '
+        '--configfile {output}"'
