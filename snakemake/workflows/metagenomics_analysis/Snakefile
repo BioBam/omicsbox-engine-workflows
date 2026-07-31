@@ -1,0 +1,312 @@
+# =============================================================================
+# FILE: workflows/metagenomics_analysis/Snakefile
+# OmicsBox Metagenomics Analysis pipeline: read QC -> trimming -> QC again ->
+# contaminant removal -> de novo assembly -> gene prediction -> functional annotation
+# (Pfam domains and orthology, in parallel). Each step runs one `omicsbox` command;
+# OmicsBox performs the analysis and handles parallelisation and resources.
+#
+# Architecture: one `include:` per module used (each defines a generic rule named
+# after the OmicsBox operation), then one `use rule <operation> as <step> with:` per
+# step, which instantiates that operation for this position in the pipeline.
+#
+# Wiring: each step declares the EXACT filename(s) it produces; downstream steps take
+# their input via `rules.<step>.output.<name>` (works because the rules are `include`d
+# into one namespace - the `module` import does not expose named outputs this way).
+# Blocks are therefore in topological order.
+#
+# NOTE - the `_step` names: with `include`, a rule and its base share one namespace, so
+# an instance cannot reuse the base rule's name. The five steps whose natural name
+# equals their operation (`trimmomatic`, `cont_rem`, `megahit`, `prodigal`,
+# `pfam_scan`, `eggnog_mapper`) are suffixed `_step`; their config keys, folders and
+# logs stay unsuffixed.
+#
+# Run (host OmicsBox on PATH):
+#   snakemake -s workflows/metagenomics_analysis/Snakefile \
+#       --config input_paired_end='data/*_{1,2}.fastq.gz' --cores 4
+# Container image:  add  --sdm apptainer
+# Export a config template:  snakemake -s .../Snakefile dump_config --cores 1
+# =============================================================================
+
+import os
+import yaml
+from snakemake.utils import update_config
+
+
+# -----------------------------------------------------------------------------
+# Rule library - one `include` per module used. These define the generic base
+# rules (dormant templates); the workflow instantiates them with
+# `use rule ... as ... with:` further down. `common.smk` provides the
+# stage/join_args/logfile/require/optional_input/raw_reads/single_end helpers.
+# -----------------------------------------------------------------------------
+include: "../../modules/common.smk"
+include: "../../modules/general_tools/fastqc.smk"  # rule fastqc
+include: "../../modules/general_tools/trimmomatic.smk"  # rule trimmomatic
+include: "../../modules/metagenomics/cont_rem.smk"  # rule cont_rem
+include: "../../modules/metagenomics/megahit.smk"  # rule megahit
+include: "../../modules/metagenomics/prodigal.smk"  # rule prodigal
+include: "../../modules/metagenomics/pfam_scan.smk"  # rule pfam_scan
+include: "../../modules/metagenomics/eggnog_mapper.smk"  # rule eggnog_mapper
+
+
+# -----------------------------------------------------------------------------
+# Configuration, layered in three deep-merged levels (later layers win).
+# Precedence, low to high:
+#   1. ../../defaults.yaml  shared, author-controlled infrastructure, used by every
+#                           workflow in this repo; NOT exported by dump_config
+#   2. config.yaml          this workflow's params (the dump_config template)
+#   3. --configfile/--config user overrides at run time
+#
+# Do NOT "simplify" this to the native `configfile:` directive. `configfile:`
+# resolves its path relative to the WORKING DIRECTORY, not the Snakefile, so it
+# breaks the two execution modes we support: running `-s /path/to/Snakefile` from
+# another folder, and the no-clone remote run `-s gh:owner/repo@ref:...` (the YAML
+# files aren't in the CWD there at all). `workflow.source_path()` resolves relative
+# to the Snakefile and fetches into the source cache on remote runs, so it works in
+# both. The manual `update_config` calls are what `configfile:` would otherwise do
+# for us (deep-merge CLI overrides on top).
+# -----------------------------------------------------------------------------
+with open(workflow.source_path("../../defaults.yaml")) as _fh:
+    _merged = yaml.safe_load(_fh)
+with open(workflow.source_path("config.yaml")) as _fh:
+    update_config(_merged, yaml.safe_load(_fh))
+update_config(_merged, config)  # --configfile + --config (already merged into `config`)
+config = _merged
+
+# -----------------------------------------------------------------------------
+# Derived globals.
+#
+# ABSOLUTE on purpose (os.path.abspath, resolved against the launch dir): the
+# OmicsBox CLI resolves a relative output folder against ITS OWN install dir
+# (e.g. /OBC/OmicsBoxCli), not the Snakemake working dir - so a relative path
+# would silently write outputs to the wrong place and every step would fail with
+# MissingOutputException.
+# -----------------------------------------------------------------------------
+OUTDIR = os.path.abspath(
+    os.path.join(config["local_folder"], config.get("run_id") or "metagenomics_analysis")
+)
+OMICSBOX_IMAGE = config["omicsbox_image"]
+CHART_FORMAT = config["chart_format"]
+
+
+# -----------------------------------------------------------------------------
+# Optional input files (`optional_input()` from common.smk). An empty list means
+# "no file here", so the matching flag is left out of the command; a real path is
+# tracked, so its existence is checked before anything runs.
+# -----------------------------------------------------------------------------
+FASTQC_ADAPTERS = optional_input("fastqc_adapters")
+FASTQC_CONTAMINANTS = optional_input("fastqc_contaminants")
+TRIMMOMATIC_ADAPTERS = optional_input("trimmomatic_adapters")
+
+# A custom genome to screen against, instead of one of the built-in indexes. It is only
+# read when the contaminant removal step's `--target-index` asks for a database to be
+# built from a supplied genome, so the two settings have to agree.
+CONT_REM_TARGET = optional_input("cont_rem_target_genome")
+CONT_REM_TARGET_FLAG = (
+    f'--i-target-genome="{CONT_REM_TARGET[0]}"' if CONT_REM_TARGET else ""
+)
+
+
+# Reads: `raw_reads`/`single_end` (common.smk) resolve the `input_single_end` /
+# `input_paired_end` globs - exactly one must be given, and which one tells the
+# tools whether to expect read pairs.
+SINGLE_END = single_end()
+
+
+# Global container default. Honoured only with `--sdm apptainer`; otherwise the host
+# `omicsbox` is used.
+container: OMICSBOX_IMAGE
+
+
+# -----------------------------------------------------------------------------
+# Default target - terminal outputs (drives the whole DAG).
+#
+# This is the switchboard: a step runs only if its output is requested, so listing a
+# terminal output here enables that step and removing it disables the step (and any
+# upstream step no other target needs). The two QC steps are leaves on purpose -
+# nothing consumes their reports - and the two annotation steps both read the same
+# predicted genes in parallel.
+# -----------------------------------------------------------------------------
+rule all:
+    default_target: True
+    input:
+        os.path.join(stage("fastqc_raw"), "fastqc_report.box"),
+        os.path.join(stage("fastqc_raw"), "quality_assessment.box"),
+        os.path.join(stage("fastqc_post"), "fastqc_report.box"),
+        os.path.join(stage("fastqc_post"), "quality_assessment.box"),
+        os.path.join(stage("pfam_scan"), "PfamScan_Annotations.box"),
+        os.path.join(stage("pfam_scan"), "PfamScan_Report.box"),
+        os.path.join(stage("eggnog_mapper"), "eggnog_annotations.box"),
+        os.path.join(stage("eggnog_mapper"), "eggnog_report.box"),
+
+
+# -----------------------------------------------------------------------------
+# Wire each step (topological order, so rules.<upstream>.output resolves).
+# -----------------------------------------------------------------------------
+
+
+# 01 - Quality assessment of the raw reads. A leaf: its reports are for the user to
+# read, nothing downstream consumes them.
+use rule fastqc as fastqc_raw with:
+    input:
+        reads=raw_reads,
+        adapters=FASTQC_ADAPTERS,
+        contaminants=FASTQC_CONTAMINANTS,
+    output:
+        report=os.path.join(stage("fastqc_raw"), "fastqc_report.box"),
+        quality=os.path.join(stage("fastqc_raw"), "quality_assessment.box"),
+    log:
+        logfile("fastqc_raw"),
+    params:
+        outdir=stage("fastqc_raw"),
+        args=join_args("fastqc_raw"),
+
+
+# 02 - Trimming. Writes the trimmed reads plus its own report into one folder; the
+# reads land at the folder root and any unpaired mates in an `unpaired/` sub-folder.
+use rule trimmomatic as trimmomatic_step with:
+    input:
+        reads=raw_reads,
+        adapters=TRIMMOMATIC_ADAPTERS,
+    output:
+        trimmed=directory(stage("trimmomatic")),
+    log:
+        logfile("trimmomatic"),
+    params:
+        single_end=SINGLE_END,
+        up_pattern=config.get("upstream_pattern", "_1"),
+        down_pattern=config.get("downstream_pattern", "_2"),
+        args=join_args("trimmomatic"),
+
+
+# 03 - Quality assessment again, now on the trimmed reads. Same operation as step 01,
+# instantiated a second time with its own input and config. Takes the trimmomatic
+# folder and globs its root, so it sees the trimmed reads and not the unpaired ones.
+use rule fastqc as fastqc_post with:
+    input:
+        reads=rules.trimmomatic_step.output.trimmed,
+        adapters=FASTQC_ADAPTERS,
+        contaminants=FASTQC_CONTAMINANTS,
+    output:
+        report=os.path.join(stage("fastqc_post"), "fastqc_report.box"),
+        quality=os.path.join(stage("fastqc_post"), "quality_assessment.box"),
+    log:
+        logfile("fastqc_post"),
+    params:
+        outdir=stage("fastqc_post"),
+        args=join_args("fastqc_post"),
+
+
+# 04 - Contaminant removal. Aligns the trimmed reads against a target genome and keeps
+# the reads that did NOT match, which are the ones the assembly needs. The whole folder
+# is the output: it holds one file per sample for each read set kept, plus this step's
+# report and charts. Names are chosen per sample, so consumers glob the prefix they
+# need - `un_` for the decontaminated reads.
+use rule cont_rem as cont_rem_step with:
+    input:
+        reads=rules.trimmomatic_step.output.trimmed,
+        target=CONT_REM_TARGET,
+    output:
+        directory(stage("cont_rem")),
+    log:
+        logfile("cont_rem"),
+    params:
+        single_end=SINGLE_END,
+        up_pattern=config.get("upstream_pattern", "_1"),
+        down_pattern=config.get("downstream_pattern", "_2"),
+        target_flag=CONT_REM_TARGET_FLAG,
+        args=join_args("cont_rem"),
+
+
+# 05 - De novo assembly of the decontaminated reads into contigs.
+#
+# `reads_glob` is what makes this step take the RIGHT read set: the folder above can
+# hold both the reads that matched the target genome and the reads that did not,
+# depending on how the previous step is configured. Only the unmatched ones (`un_`)
+# belong in an assembly - assembling the others would succeed and quietly give
+# contaminant contigs.
+use rule megahit as megahit_step with:
+    input:
+        reads=rules.cont_rem_step.output,
+    output:
+        contigs=os.path.join(stage("megahit"), "megahit-contigs.fasta"),
+        report=os.path.join(stage("megahit"), "megahit_report.box"),
+        nx_plot=os.path.join(stage("megahit"), f"nx-plot.{CHART_FORMAT}"),
+    log:
+        logfile("megahit"),
+    params:
+        single_end=SINGLE_END,
+        up_pattern=config.get("upstream_pattern", "_1"),
+        down_pattern=config.get("downstream_pattern", "_2"),
+        reads_glob="un_*.fq.gz",
+        chart_format=CHART_FORMAT,
+        outdir=stage("megahit"),
+        args=join_args("megahit"),
+
+
+# 06 - Gene prediction on the assembled contigs. Writes the predicted genes both as
+# proteins and as nucleotides; the two annotation steps below read the nucleotide set.
+use rule prodigal as prodigal_step with:
+    input:
+        contigs=rules.megahit_step.output.contigs,
+    output:
+        proteins=os.path.join(stage("prodigal"), "faa.fasta"),
+        genes=os.path.join(stage("prodigal"), "fna.fasta"),
+        gff=os.path.join(stage("prodigal"), "gff.gff"),
+        report=os.path.join(stage("prodigal"), "prodigal_report.box"),
+        gc_chart=os.path.join(stage("prodigal"), f"gc-content-distribution.{CHART_FORMAT}"),
+        length_chart=os.path.join(
+            stage("prodigal"), f"gene-length-distribution.{CHART_FORMAT}"
+        ),
+    log:
+        logfile("prodigal"),
+    params:
+        outdir=stage("prodigal"),
+        chart_format=CHART_FORMAT,
+        args=join_args("prodigal"),
+
+
+# 07 - Pfam domain annotation of the predicted genes. Runs in parallel with step 08.
+use rule pfam_scan as pfam_scan_step with:
+    input:
+        fasta=rules.prodigal_step.output.genes,
+    output:
+        annotations=os.path.join(stage("pfam_scan"), "PfamScan_Annotations.box"),
+        report=os.path.join(stage("pfam_scan"), "PfamScan_Report.box"),
+    log:
+        logfile("pfam_scan"),
+    params:
+        outdir=stage("pfam_scan"),
+        args=join_args("pfam_scan"),
+
+
+# 08 - Orthology-based functional annotation of the same predicted genes. Runs in
+# parallel with step 07.
+use rule eggnog_mapper as eggnog_mapper_step with:
+    input:
+        fasta=rules.prodigal_step.output.genes,
+    output:
+        annotations=os.path.join(stage("eggnog_mapper"), "eggnog_annotations.box"),
+        report=os.path.join(stage("eggnog_mapper"), "eggnog_report.box"),
+    log:
+        logfile("eggnog_mapper"),
+    params:
+        outdir=stage("eggnog_mapper"),
+        args=join_args("eggnog_mapper"),
+
+
+# -----------------------------------------------------------------------------
+# Config template export: copies the packaged config.yaml (comments included) into
+# the launch directory so you can edit it and pass it with --configfile.
+#   snakemake -s .../Snakefile dump_config --cores 1
+# -----------------------------------------------------------------------------
+rule dump_config:
+    output:
+        "metagenomics_analysis.config.yaml",
+    log:
+        logfile("dump_config"),
+    params:
+        src=workflow.source_path("config.yaml"),
+    shell:
+        "cp {params.src} {output} 2> {log} && "
+        'echo "[OK] Template exported to {output} - edit it and run with '
+        '--configfile {output}"'

@@ -1,0 +1,300 @@
+# =============================================================================
+# FILE: workflows/genetic_variation_analysis/config.yaml
+# User-editable configuration for the Genetic Variation Analysis pipeline.
+#
+# This is the file `snakemake ... dump_config` exports for you to edit. It holds
+# every user-facing parameter.
+#
+# HOW TO OVERRIDE:
+#   * copy this file with `snakemake ... dump_config` and edit the copy, then
+#     pass it with `--configfile genetic_variation_analysis.config.yaml`
+#   * or override single keys inline: `--config input_fasta=/data/genome.fasta`
+#
+# Uncomment a list item to enable that flag (parameters blocked by dependencies stay
+# commented until their dependency is turned on).
+#
+# NOTE: each step's `args` is replaced as a WHOLE LIST, never merged item by item.
+# Edit flags inside the full list below; do not hand-write a minimal `args:` with a
+# single flag, or the rest of that step's flags are dropped.
+# =============================================================================
+
+# ---------------------------------------------------
+# WORKFLOW PARAMETERS
+# ---------------------------------------------------
+# Reads: give EXACTLY ONE of the two globs. Which one you set is also what tells the
+# tools whether to expect read pairs.
+input_single_end: null             # Glob for single-end reads (e.g. 'data/*.fastq.gz')
+input_paired_end: null             # Glob for paired-end reads (e.g. 'data/*_{1,2}.fastq.gz')
+
+input_fasta: null                  # Reference genome FASTA (REQUIRED at run time). SHARED by three
+                                   # steps - the alignment, the variant calling and the annotation -
+                                   # so all three see the same sequences. Ensembl recommended.
+chart_format: "box"                # Output chart format for all chart steps: [box, png, pdf, csv]
+
+# --- R1/R2 filename patterns, PAIRED-END only ---
+# upstream_pattern: "_1"           # R1 filename pattern (e.g. '_1' -> sample_1.fastq.gz)
+# downstream_pattern: "_2"         # R2 filename pattern (e.g. '_2' -> sample_2.fastq.gz)
+
+# --- Required step inputs ---
+variant_annotation_annotation: null   # Annotation GTF (REQUIRED at run time). Used ONLY by the
+                                      # annotation step; must match the genome species and version.
+gwas_input_pheno: null                # Tab-separated traits table (REQUIRED at run time). First
+                                      # column = sample names matching the variant file, traits in
+                                      # the following columns, header required.
+
+# --- Optional input files (leave null unless you need them) ---
+fastqc_adapters: null              # Custom adapter FASTA screened by both QC steps
+fastqc_contaminants: null          # Custom contaminant FASTA screened by both QC steps
+trimmomatic_adapters: null         # Custom adapter FASTA used for trimming
+
+# The three below are each paired with a switch in their step's `args`. Setting the file
+# without turning its switch on means the file is ignored; turning the switch on without
+# the file leaves that step with nothing to read. Set both halves or neither.
+bcftools_group_experiment: null     # Tab-delimited sample-to-group file. Requires
+                                    # `--use-groups=true` in the bcftools block below.
+gwas_kinship: null                  # Precomputed kinship matrix. Requires `--use-kinship=true`
+                                    # in the gwas block below.
+gwas_covariate_matrix: null         # Covariate-matrix metadata file. Requires
+                                    # `--use-covariate-matrix=true` in the gwas block below.
+
+# --- Output location (results go to <local_folder>/<run_id>/) ---
+local_folder: "results"            # Base output directory
+run_id: null                       # Run sub-folder: YOU name the run. null -> the workflow
+                                   # name "genetic_variation_analysis". Paths are deterministic,
+                                   # so reusing a run_id resumes it; use a fresh name to isolate
+                                   # a run.
+
+# ---------------------------------------------------
+# PER-STEP CONFIGURATION
+# `outdir` is the step's numbered result sub-folder; `args` is the list of flags
+# injected into its `omicsbox` call.
+# ---------------------------------------------------
+
+# =================================================================
+# PHASE 1: RAW QUALITY CONTROL (PRE-TRIMMING)
+# =================================================================
+fastqc_raw:
+  outdir: "01_fastqc_raw"
+  args:
+    - "--binning=true"   # [true, false] Group bases in QC plots. Default: true
+
+# =================================================================
+# PHASE 2: READ PREPROCESSING & TRIMMING
+# =================================================================
+trimmomatic:
+  outdir: "02_trimmomatic"
+  args:
+    - "--quality-encoding=auto"              # [auto, phred33, phred64] Auto-detect read quality encoding. Default: auto
+
+    # -- Adapter Removal --
+    # - "--prefix=trimmed_"                  # Output filename prefix.
+    #   WARNING: --prefix changes the sample names downstream (they end up in the alignments and
+    #            the variant file). Keep it unset unless you know you need it.
+    - "--remove-adapters=false"              # [true, false] Enable adapter/contaminant trimming. Default: false
+    # - "--adapter-options=default"          # [default, custom] Adapter removal strategy (only if remove-adapters=true)
+    # - "--adapter-list=TruSeq3-SE.fa"       # [TruSeq3-SE.fa, TruSeq2-SE.fa, NexteraPE-PE.fa] Adapter list (only if adapter-options=default)
+    # - "--seed-mismatches=2"                # Max mismatches for full adapter match (only if remove-adapters=true)
+    # - "--simple-clip-threshold=15"         # Simple adapter match accuracy threshold (only if remove-adapters=true)
+    # - "--palindrome-clip-threshold=30"     # Palindrome clip accuracy threshold (only if remove-adapters=true; PAIRED-END only)
+
+    # -- Paired-End Mode -- (PAIRED-END ONLY, do not enable for single-end input)
+    # - "--min-adapter-length=8"             # Min detectable adapter length (only if remove-adapters=true; PAIRED-END only)
+    # - "--keep-both-reads=true"             # Retain reverse read after palindrome detection (only if remove-adapters=true; PAIRED-END only)
+
+    # -- Edge Trimming --
+    - "--edge-trimming=false"                # [true, false] Enable edge trimming. Default: false
+    # - "--edge-trimming-options=qual"       # [qual, length] Edge trimming strategy (only if edge-trimming=true)
+    # - "--qual-trimming-from5p=true"        # Trim low-quality bases from 5' (only if edge-trimming-options=qual)
+    # - "--normal-trimming-threshold5p=30"   # Min quality threshold at 5' (only if qual-trimming-from5p=true)
+    # - "--qual-trimming-from3p=true"        # Trim low-quality bases from 3' (only if edge-trimming-options=qual)
+    # - "--normal-trimming-threshold3p=30"   # Min quality threshold at 3' (only if qual-trimming-from3p=true)
+    # - "--length-trimming-from5p=false"     # Crop N bases from 5' (only if edge-trimming-options=length)
+    # - "--length-trimming-threshold5p-remove=3"   # Bases to remove from 5' (only if length-trimming-from5p=true)
+    # - "--length-trimming-from3p=false"     # Crop to fixed length from 3' (only if edge-trimming-options=length)
+    # - "--length-trimming-threshold3p-keep=150"   # Bases to keep from start (only if length-trimming-from3p=true)
+
+    # -- Quality Trimming --
+    - "--quality-trimming=false"             # [true, false] Enable sliding-window or maxinfo trimming
+    # - "--quality-trimming-options=sliding" # [sliding, maxinfo] Quality trimming strategy (only if quality-trimming=true)
+    # - "--window-size=4"                    # Sliding window width (only if quality-trimming-options=sliding)
+    # - "--required-quality=15"              # Min avg quality in window (only if quality-trimming-options=sliding)
+    # - "--target-length=40"                 # Target read length for maxinfo (only if quality-trimming-options=maxinfo)
+    # - "--strictness=0.5"                   # [0..1] Length vs correctness tradeoff (only if quality-trimming-options=maxinfo)
+
+    # -- Quality & Length Filtering --
+    - "--filter-by-quality=true"             # [true, false] Discard reads below average quality. Default: true
+    - "--average-quality=25"                 # [integer] Min average quality to retain a read (only if filter-by-quality=true)
+    - "--filter-by-length=true"              # [true, false] Discard reads below minimum length. Default: true
+    - "--minimum-length=36"                  # [integer] Minimum retained read length in bp (only if filter-by-length=true)
+
+# =================================================================
+# PHASE 3: QUALITY CONTROL (POST-TRIMMING)
+# =================================================================
+fastqc_post:
+  outdir: "03_fastqc_post"
+  args:
+    - "--binning=true"   # [true, false] Group bases in QC plots. Default: true
+
+# =================================================================
+# PHASE 4: READ ALIGNMENT
+# =================================================================
+bwa:
+  outdir: "04_bwa"
+  args:
+    # -- Algorithm --
+    - "--minimum-seed-length=19"             # [integer] Minimum seed length. Default: 19
+    - "--band-width=100"                     # [integer] Band width for banded alignment. Default: 100
+    - "--z-dropoff=100"                      # [integer] Off-diagonal X-dropoff (Z-dropoff). Default: 100
+    - "--trigger-re-seeding=1.5"             # [float] Re-seeding trigger. Default: 1.5
+    - "--seed-occurrence=20"                 # [integer] Seed occurrence for the 3rd round seeding. Default: 20
+    - "--skip-seeds=500"                     # [integer] Skip seeds with more than this occurrences. Default: 500
+    - "--drop-chains=0.5"                    # [float] Drop chains shorter than this fraction of the longest. Default: 0.5
+    - "--discard-chains=0"                   # [integer] Discard chains this many bp shorter than the best overlapping chain. Default: 0
+    - "--mate-rescue-rounds=50"              # [integer] Mate rescue rounds. Default: 50
+    - "--skip-mate-rescue=false"             # [true, false] Skip mate rescue. Default: false
+    - "--skip-pairing=false"                 # [true, false] Skip pairing (mate rescue performed unless also skipped). Default: false
+
+    # -- Scoring --
+    - "--matching-score=1"                   # [integer] Match score. Default: 1
+    - "--mismatch-penalty=4"                 # [integer] Mismatch penalty. Default: 4
+    - "--gap-open-penalty-deletion=6"        # [integer] Gap open penalty (deletions). Default: 6
+    - "--gap-open-penalty-insertion=6"       # [integer] Gap open penalty (insertions). Default: 6
+    - "--gap-extension-penalty-deletion=1"   # [integer] Gap extension penalty (deletions). Default: 1
+    - "--gap-extension-penalty-insertion=1"  # [integer] Gap extension penalty (insertions). Default: 1
+    - "--five-clipping-penalty=5"            # [integer] 5'-end clipping penalty. Default: 5
+    - "--three-clipping-penalty=5"           # [integer] 3'-end clipping penalty. Default: 5
+    - "--unpaired-penalty=17"                # [integer] Unpaired read pair penalty. Default: 17
+
+    # -- Output --
+    - "--minimum-score=30"                   # [integer] Minimum score to output. Default: 30
+    - "--primary-split-alignment=false"      # [true, false] Mark shorter split hits as primary. Default: false
+    - "--map-qsup-alignment=false"           # [true, false] MapQ of supplementary alignments. Default: false
+    - "--out-all-sealignments=false"         # [true, false] Output all single-end alignments. Default: false
+    - "--soft-clipping=false"                # [true, false] Use soft clipping for supplementary alignments. Default: false
+    - "--split-as-secondary=false"           # [true, false] Mark shorter split hits as secondary. Default: false
+    - "--sort=coordinate"                    # [coordinate, readName] BAM sort order. Default: coordinate
+    - "--add-rg=true"                        # [true, false] Add Read Group (@RG) header. Default: true
+    - "--rg-platform=ILLUMINA"               # [ILLUMINA, IONTORRENT, HELICOS, LS454] Sequencing platform (only if add-rg=true)
+
+# =================================================================
+# PHASE 5: VARIANT CALLING
+# =================================================================
+bcftools:
+  outdir: "05_variant_calling"
+  args:
+    # -- BAM Preprocessing --
+    - "--remove-duplicates=true"    # [true, false] Remove PCR duplicates (WGS/WES). NOT recommended for GBS/RADSeq. Default: true
+
+    # -- Basic Mpileup Parameters --
+    - "--adj-mp=0"                  # [integer >=0] Downgrade mapping quality for reads with excessive mismatches (0 = disabled). Default: 0
+    - "--max-dp=250"                # [integer >=0] Maximum raw per-file depth. Default: 250
+    - "--min-mq=0"                  # [integer >=0] Minimum mapping quality. Default: 0
+    - "--min-bq=13"                 # [integer >=0] Minimum base quality. Default: 13
+    - "--ignore-rg=false"           # [true, false] Ignore RG tags (treat a whole BAM as one sample). Default: false
+    - "--baq=-B"                    # [-B, -E, -D] Per-base alignment quality: -B No BAQ (recommended, fewer false positives), -E Redo BAQ, -D Full BAQ. Default: -B
+
+    # -- Advanced Mpileup Parameters --
+    - "--ext-prob=20"               # [integer >=0] Phred-scaled gap extension error prob (lower -> longer indels). Default: 20
+    - "--gap-frac=0.002"            # [double >=0.0] Minimum fraction of gapped reads. Default: 0.002
+    - "--tand-qual=500"             # [integer >=0] Homopolymer error model coefficient. Default: 500
+    - "--skip-indel=false"          # [true, false] Do not perform indel calling. Default: false
+    - "--min-ireads=1"              # [integer >=1] Minimum gapped reads for indel candidates. Default: 1
+    - "--open-prob=40"              # [integer >=0] Phred-scaled gap open error prob (lower -> more indels). Default: 40
+
+    # -- Call Parameters --
+    - "--keep-alts=true"            # [true, false] Output all alternate alleles even if absent from genotypes. Default: true
+    - "--use-groups=false"          # [true, false] Group samples into populations (HWE per population). Default: false.
+                                    # If true, also set `bcftools_group_experiment` at the top of this file.
+
+# =================================================================
+# PHASE 6: VARIANT FILTERING
+# =================================================================
+variant_filtering:
+  outdir: "06_variant_filtering"
+  args:
+    - "--qualao=2.0"                # [double >=0.0] Ratio between SNP Phred quality and full alt-haplotype observation count. Default: 2.0
+    - "--dp=10"                     # [integer >=0] Total sequencing depth overlapping the position. Default: 10
+    - "--qual=20.0"                 # [double] Phred-scaled quality for the assertion that the alternative allele is real. Default: 20.0
+    - "--mqm=55.0"                  # [double >=0.0] Mapping-quality mean threshold (lower MQ -> higher misplacement probability). Default: 55.0
+
+    # -- Genotypic Options --
+    - "--remove-multiple=false"     # [true, false] Remove multiallelic sites. RECOMMENDED before the association study (consider setting true). Default: false
+    - "--missing=0.1"               # [double 0.0-1.0] Max fraction of missing genotypes per variant. Default: 0.1
+    - "--genotype-depth=0"          # [integer >=0] Min raw read depth all genotypes must have (0 = disabled). Default: 0
+    - "--genotype-qual=0"           # [integer >=0] Min Genotype Quality all genotypes must have (0 = disabled). Default: 0
+    - "--maf=0.05"                  # [double 0.0-1.0] Minimum Minor Allele Frequency to keep a variant. Default: 0.05
+
+    # -- Freebayes-specific Options --
+    - "--both-strands=false"        # [true, false] Require at least one read on each strand. Default: false
+    - "--balanced=false"            # [true, false] Require at least two reads balanced to each side. Default: false
+
+# =================================================================
+# PHASE 7: GENOTYPE PHASING & IMPUTATION
+# =================================================================
+beagle:
+  outdir: "07_beagle"
+  args:
+    # -- Phasing Parameters --
+    - "--burnin=3"                  # [integer >=1] Max burn-in iterations for the initial haplotype-frequency model. Default: 3
+    - "--iterations=12"             # [integer >=1] Iterations to estimate genotype phase (more -> more accuracy, slower). Default: 12
+    - "--phase-states=280"          # [integer >=1] Model states used to estimate phase. Default: 280
+
+    # -- Imputation Parameters --
+    - "--imp-states=1600"           # [integer >=1] Model states used to impute ungenotyped markers. Default: 1600
+    - "--imp-segment=6.0"           # [double >=0.0] Min cM length of haplotype segments in the HMM state space. Default: 6.0
+    - "--imp-step=0.1"              # [double >=0.0] cM step length to detect short IBS segments. Default: 0.1
+    - "--imp-nstep=1600"            # [integer >=1] Consecutive steps to detect long IBS segments. Default: 1600
+    - "--cluster=0.005"             # [double >=0.0] Max cM distance between markers merged into an aggregate marker. Default: 0.005
+
+    # -- General Parameters --
+    - "--em=true"                   # [true, false] Estimate Effective Population Size via EM before phasing. Default: true.
+                                    # If false, --ne below applies.
+    # - "--ne=100000"               # [integer >=1] Effective Population Size (only if em=false). Default: 100000
+    - "--window=40.0"               # [double >=0.0] Sliding window length in cM (lower -> less memory). Default: 40.0
+    - "--overlap=2.0"               # [double >=0.0] cM overlap between adjacent sliding windows. Default: 2.0
+
+# =================================================================
+# PHASE 8: GENOME-WIDE ASSOCIATION STUDY
+# =================================================================
+gwas:
+  outdir: "08_gwas"
+  args:
+    # -- SNP filtering --
+    - "--hwe-pvalue=0.05"           # [double >=0.0] Hardy-Weinberg exact-test p-value; sites below are excluded. Default: 0.05
+    - "--maf=0.01"                  # [double 0.0-1.0] Keep sites with Minor Allele Frequency >= this. Default: 0.01
+    - "--max-missing=0.01"          # [double 0.0-1.0] Exclude sites by proportion of missing data. Default: 0.01
+
+    # -- Sample filtering --
+    - "--sample-missingness=0.7"    # [double 0.0-1.0] Exclude samples by proportion of missing data. Default: 0.7
+
+    # -- Linkage Disequilibrium Pruning --
+    - "--do-ld=true"                # [true, false] Perform LD pruning. Default: true
+    - "--max-ld=0.6"                # [double 0.0-1.0] R2 threshold to prune loci in LD (only if do-ld=true). Default: 0.6
+    - "--window-size=1000"          # [integer >=1] Window size in loci to search for LD (only if do-ld=true). Default: 1000
+
+    # -- Phenotype standarization --
+    - "--normalize=true"            # [true, false] Rank-based inverse normal transform of the phenotype. Default: true
+    - "--remove-outliers=false"     # [true, false] Remove phenotype outliers (beyond 1.5x IQR). Default: false
+
+    # -- Kinship --
+    - "--use-kinship=false"         # [true, false] Use a kinship matrix. Default: false. If true, set `gwas_kinship`
+                                    # at the top of this file AND the three kinship-* flags below are ignored.
+    - "--kinship-group=Mean"        # [Mean, Minimum, Maximum, Median] Grouping to build the matrix (only if use-kinship=false). Default: Mean
+    - "--kinship-cluster=Average"   # [Average, Complete, Ward, Single, McQuitty, Median, Centroid] Sample clustering method (only if use-kinship=false). Default: Average
+    - "--kinship-algorithm=VanRaden"  # [VanRaden, EMMA, Loiselle, Zhang] Kinship matrix algorithm (only if use-kinship=false). Default: VanRaden
+
+    # -- Covariates --
+    - "--use-covariate-matrix=false"  # [true, false] Use a covariate matrix. Default: false. If true, set
+                                      # `gwas_covariate_matrix` at the top of this file AND --pcas is ignored.
+    - "--pcas=2"                    # [integer >=2] PCA dimensions to build covariates (only if use-covariate-matrix=false). Default: 2
+
+    - "--model=mlm"                 # [glm, mlm, cmlm, mlmm, super, farmcpu, blink, gblup, cblup] Association model. Default: mlm
+
+# =================================================================
+# PHASE 9: VARIANT ANNOTATION
+# =================================================================
+# No tunable parameters: this step takes inputs only - the filtered variants, the
+# annotation GTF and the genome.
+variant_annotation:
+  outdir: "09_variant_annotation"
+  args: []

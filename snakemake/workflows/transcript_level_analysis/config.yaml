@@ -1,0 +1,207 @@
+# =============================================================================
+# FILE: workflows/transcript_level_analysis/config.yaml
+# User-editable configuration for the Transcript-Level Analysis pipeline.
+#
+# This is the file `snakemake ... dump_config` exports for you to edit. It holds
+# every user-facing parameter.
+#
+# HOW TO OVERRIDE:
+#   * copy this file with `snakemake ... dump_config` and edit the copy, then
+#     pass it with `--configfile transcript_level_analysis.config.yaml`
+#   * or override single keys inline: `--config input_fasta=/data/transcriptome.fasta`
+#
+# Uncomment a list item to enable that flag (parameters blocked by dependencies stay
+# commented until their dependency is turned on).
+#
+# NOTE: each step's `args` is replaced as a WHOLE LIST, never merged item by item.
+# Edit flags inside the full list below; do not hand-write a minimal `args:` with a
+# single flag, or the rest of that step's flags are dropped.
+# =============================================================================
+
+# ---------------------------------------------------
+# WORKFLOW PARAMETERS
+# ---------------------------------------------------
+# Reads: give EXACTLY ONE of the two globs. Which one you set is also what tells the
+# tools whether to expect read pairs.
+input_single_end: null             # Glob for single-end reads (e.g. 'data/*.fastq.gz')
+input_paired_end: null             # Glob for paired-end reads (e.g. 'data/*_{1,2}.fastq.gz')
+
+input_fasta: null                  # Reference transcriptome FASTA (REQUIRED at run time)
+experimental_design: null          # Tab-delimited experimental design file (REQUIRED at run time)
+chart_format: "box"                # Output chart format for all chart steps: [box, png, pdf, csv]
+
+# --- R1/R2 filename patterns, PAIRED-END only ---
+# upstream_pattern: "_1"           # R1 filename pattern (e.g. '_1' -> sample_1.fastq.gz)
+# downstream_pattern: "_2"         # R2 filename pattern (e.g. '_2' -> sample_2.fastq.gz)
+
+# --- Optional input files (leave null unless you need them) ---
+fastqc_adapters: null              # Custom adapter FASTA screened by both QC steps
+fastqc_contaminants: null          # Custom contaminant FASTA screened by both QC steps
+trimmomatic_adapters: null         # Custom adapter FASTA used for trimming
+
+# --- Analysis-level switches (they change more than one step, so they live here) ---
+rsem_gene_level: false             # [true, false] Quantify gene-level expression (each gene's
+                                   # value is the sum of its isoforms') and run BOTH statistics
+                                   # steps on the gene count table instead of the transcript
+                                   # one. Requires rsem_gene_trans_map below.
+rsem_gene_trans_map: null          # Transcript-to-gene map, tab-delimited as
+                                   # 'gene id <TAB> transcript id'. Only read when
+                                   # rsem_gene_level is true, and required in that case.
+counts_pca_use_design: true        # [true, false] Colour the PCA by the experimental design.
+                                   # Set false for a plain, unlabelled PCA - useful to inspect
+                                   # sample clustering without being guided by the group
+                                   # labels. Does not affect the differential expression step,
+                                   # where the design is the model and always used.
+
+# --- Output location (results go to <local_folder>/<run_id>/) ---
+local_folder: "results"            # Base output directory
+run_id: null                       # Run sub-folder: YOU name the run. null -> the workflow
+                                   # name "transcript_level_analysis". Paths are deterministic,
+                                   # so reusing a run_id resumes it; use a fresh name to
+                                   # isolate a run.
+
+# ---------------------------------------------------
+# PER-STEP CONFIGURATION
+# `outdir` is the step's numbered result sub-folder; `args` is the list of flags
+# injected into its `omicsbox` call.
+# ---------------------------------------------------
+
+# =================================================================
+# PHASE 1: RAW QUALITY CONTROL (PRE-TRIMMING)
+# =================================================================
+fastqc_raw:
+  outdir: "01_fastqc_raw"
+  args:
+    - "--binning=true"   # [true, false] Group bases in QC plots. Default: true
+
+# =================================================================
+# PHASE 2: READ PREPROCESSING & TRIMMING
+# =================================================================
+trimmomatic:
+  outdir: "02_trimmomatic"
+  args:
+    - "--quality-encoding=auto"              # [auto, phred33, phred64] Auto-detect read quality encoding. Default: auto
+
+    # -- Adapter Removal --
+    # - "--prefix=trimmed_"                  # Output filename prefix.
+    #   WARNING: --prefix changes the sample names in the count table generated downstream. If
+    #            enabled, the differential expression design file MUST use the same prefix, or it fails.
+    - "--remove-adapters=false"              # [true, false] Enable adapter/contaminant trimming. Default: false
+    # - "--adapter-options=default"          # [default, custom] Adapter removal strategy (only if remove-adapters=true)
+    # - "--adapter-list=TruSeq3-SE.fa"       # [TruSeq3-SE.fa, TruSeq2-SE.fa, NexteraPE-PE.fa] Adapter list (only if adapter-options=default)
+    # - "--seed-mismatches=2"                # Max mismatches for full adapter match (only if remove-adapters=true)
+    # - "--simple-clip-threshold=15"         # Simple adapter match accuracy threshold (only if remove-adapters=true)
+    # - "--palindrome-clip-threshold=30"     # PE palindrome clip accuracy threshold (only if remove-adapters=true; PAIRED-END only - errors if set with single-end)
+
+    # -- Paired-End Mode -- (PAIRED-END ONLY, do not enable for single-end input)
+    # - "--min-adapter-length=8"             # Min detectable adapter length (only if remove-adapters=true; PAIRED-END only)
+    # - "--keep-both-reads=true"             # Retain reverse read after PE palindrome detection (only if remove-adapters=true; PAIRED-END only)
+
+    # -- Edge Trimming --
+    - "--edge-trimming=false"                # [true, false] Enable edge trimming. Default: false
+    # - "--edge-trimming-options=qual"       # [qual, length] Edge trimming strategy (only if edge-trimming=true)
+    # - "--qual-trimming-from5p=true"        # Trim low-quality bases from 5' (only if edge-trimming-options=qual)
+    # - "--normal-trimming-threshold5p=30"   # Min quality threshold at 5' (only if qual-trimming-from5p=true)
+    # - "--qual-trimming-from3p=true"        # Trim low-quality bases from 3' (only if edge-trimming-options=qual)
+    # - "--normal-trimming-threshold3p=30"   # Min quality threshold at 3' (only if qual-trimming-from3p=true)
+    # - "--length-trimming-from5p=false"     # Crop N bases from 5' (only if edge-trimming-options=length)
+    # - "--length-trimming-threshold5p-remove=3"   # Bases to remove from 5' (only if length-trimming-from5p=true)
+    # - "--length-trimming-from3p=false"     # Crop to fixed length from 3' (only if edge-trimming-options=length)
+    # - "--length-trimming-threshold3p-keep=150"   # Bases to keep from start (only if length-trimming-from3p=true)
+
+    # -- Quality Trimming --
+    - "--quality-trimming=false"             # [true, false] Enable sliding-window or maxinfo trimming
+    # - "--quality-trimming-options=sliding" # [sliding, maxinfo] Quality trimming strategy (only if quality-trimming=true)
+    # - "--window-size=4"                    # Sliding window width (only if quality-trimming-options=sliding)
+    # - "--required-quality=15"              # Min avg quality in window (only if quality-trimming-options=sliding)
+    # - "--target-length=40"                 # Target read length for maxinfo (only if quality-trimming-options=maxinfo)
+    # - "--strictness=0.5"                   # [0..1] Length vs correctness tradeoff (only if quality-trimming-options=maxinfo)
+
+    # -- Quality & Length Filtering --
+    - "--filter-by-quality=true"             # [true, false] Discard reads below average quality. Default: true
+    - "--average-quality=25"                 # [integer] Min average quality to retain a read (only if filter-by-quality=true)
+    - "--filter-by-length=true"              # [true, false] Discard reads below minimum length. Default: true
+    - "--minimum-length=36"                  # [integer] Minimum retained read length in bp (only if filter-by-length=true)
+
+# =================================================================
+# PHASE 3: QUALITY CONTROL (POST-TRIMMING)
+# =================================================================
+fastqc_post:
+  outdir: "03_fastqc_post"
+  args:
+    - "--binning=true"   # [true, false] Group bases in QC plots. Default: true
+
+# =================================================================
+# PHASE 4: TRANSCRIPT QUANTIFICATION
+# =================================================================
+rsem:
+  outdir: "04_rsem"
+  args:
+    # NOTE: gene-level quantification is NOT switched here. It comes from
+    #       `rsem_gene_level` at the top of this file, because the same setting also
+    #       selects which count table the two statistics steps read.
+
+    # -- Configuration --
+    - "--estimate-rspd=true"                 # [true, false] Estimate read start position distribution. Default: true
+    - "--poly-atail=false"                   # [true, false] Add poly(A) tails for mRNA analysis. Default: false
+    # - "--poly-alength=125"                 # [1-1000] Length of poly(A) tails to add (only if poly-atail=true). Default: 125
+    - "--sequencing-protocols=none"          # [none, forward, reverse] Strand specificity. Default: none
+
+    # -- Fragment Length --
+    - "--fragment-length=false"              # [true, false] Use fragment length for single-end reads. Default: false
+    # - "--fragment-length-mean=200.0"       # Fragment length mean in bp (only if fragment-length=true)
+    # - "--fragment-length-sd=80.0"          # Fragment length standard deviation (only if fragment-length=true)
+
+    # -- Alignments --
+    - "--bam-output=true"                    # [true, false] Generate a BAM per sample (input reads aligned to
+                                             # transcript sequences). Default: false. The BAMs are left in the
+                                             # step folder; no downstream step reads them.
+
+# =================================================================
+# PHASE 5: STATISTICAL ANALYSIS (PCA)
+# =================================================================
+counts_pca:
+  outdir: "05_counts_pca"
+  args:
+    # -- Color Options -- (only meaningful while counts_pca_use_design is true)
+    # - "--factor=Sample"                    # Experimental factor for PCA coloring
+    # - "--paired-factor=Condition"          # Secondary factor for combined coloring
+    # - "--combine=false"                    # [true, false] Combine two factors into subgroups
+    - "--enable3d=false"                     # [true, false] Enable 3D PCA visualization. Default: false
+
+# =================================================================
+# PHASE 6: DIFFERENTIAL EXPRESSION ANALYSIS
+# =================================================================
+edger:
+  outdir: "06_edger"
+  args:
+    # -- Filter genes with low counts --
+    - "--filtering-mode=cpm"                 # [cpm, raw] Filtering mode. WARNING: raw disables --cpm-filter and
+                                             # --minimum-samples (comment those out if you set raw). Default: cpm
+    - "--cpm-filter=1.0"                     # [0.0-10.0] CPM filter threshold for low-count genes. Default: 1.0
+    - "--minimum-samples=2"                  # [0-100] Min samples above CPM filter. Default: 2
+
+    # -- Normalization factors to scale the raw library sizes --
+    - "--norm-method=TMM"                    # [TMM, TMMwsp, RLE, upperquartile, none] Normalization method. Default: TMM
+
+    # -- Design Type --
+    - "--design-type=Simple"                 # [Simple, Multi, Paired] Design type for analysis. Default: Simple
+
+    # -- Primary Target --
+    # - "--primary-experimental-factor=Condition"   # Primary experimental factor for comparison (only if design-type is set)
+    # - "--primary-contrast-condition=Treatment"    # Contrast condition (only if design-type is set)
+    # - "--primary-reference-condition=Control"     # Reference condition (only if design-type is set)
+
+    # -- Secondary Target --
+    # - "--secondary-experimental-factor=Batch"     # Secondary factor for Paired/Multi designs (only if design-type is Multi or Paired)
+    # - "--secondary-contrast-condition=BatchB"     # Secondary contrast condition (only if design-type=Multi)
+    # - "--secondary-reference-condition=BatchA"    # Secondary reference condition (only if design-type=Multi)
+
+    # -- Statistical Test --
+    - "--test-type=Exact"                    # [Exact, GLM_LRT, GLM_QL] Statistical test. Exact ONLY for Simple design. Default: Exact
+    - "--robust=true"                        # [true, false] Robust estimation against outlier features. Default: true
+
+    # The two below only apply to a plain-text count table. This pipeline always feeds
+    # edgeR the count table produced by the quantification step, so they never apply here.
+    # - "--delimiter=tab"                    # [tab, space, comma, semicolon] Column separator. Default: tab
+    # - "--na-treatment=skip"                # [skip, zero] NA handling. Default: skip

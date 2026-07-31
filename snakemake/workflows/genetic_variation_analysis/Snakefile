@@ -1,0 +1,348 @@
+# =============================================================================
+# FILE: workflows/genetic_variation_analysis/Snakefile
+# OmicsBox Genetic Variation Analysis pipeline: read QC -> trimming -> QC again ->
+# alignment to the reference genome -> variant calling -> variant filtering ->
+# phasing/imputation -> association study, with variant annotation branching off the
+# filtered variants. Each step runs one `omicsbox` command; OmicsBox performs the
+# analysis and handles parallelisation and resources.
+#
+# Architecture: one `include:` per module used (each defines a generic rule named
+# after the OmicsBox operation), then one `use rule <operation> as <step> with:` per
+# step, which instantiates that operation for this position in the pipeline.
+#
+# Wiring: each step declares the EXACT filename(s) it produces; downstream steps take
+# their input via `rules.<step>.output.<name>` (works because the rules are `include`d
+# into one namespace - the `module` import does not expose named outputs this way).
+# Blocks are therefore in topological order.
+#
+# NOTE - the `_step` names: with `include`, a rule and its base share one namespace, so
+# an instance cannot reuse the base rule's name. The steps whose natural name equals
+# their operation (`trimmomatic`, `bwa`, `beagle`, `gwas`, `variant_annotation`) are
+# suffixed `_step`; their config keys, folders and logs stay unsuffixed.
+#
+# Run (host OmicsBox on PATH):
+#   snakemake -s workflows/genetic_variation_analysis/Snakefile \
+#       --config input_paired_end='data/*_{1,2}.fastq.gz' \
+#                input_fasta=/path/to/genome.fasta \
+#                variant_annotation_annotation=/path/to/annotation.gtf \
+#                gwas_input_pheno=/path/to/traits.tsv --cores 4
+# Container image:  add  --sdm apptainer
+# Export a config template:  snakemake -s .../Snakefile dump_config --cores 1
+# =============================================================================
+
+import os
+import yaml
+from snakemake.utils import update_config
+
+
+# -----------------------------------------------------------------------------
+# Rule library - one `include` per module used. These define the generic base
+# rules (dormant templates); the workflow instantiates them with
+# `use rule ... as ... with:` further down. `common.smk` provides the
+# stage/join_args/logfile/require/optional_input/raw_reads/single_end helpers.
+# -----------------------------------------------------------------------------
+include: "../../modules/common.smk"
+include: "../../modules/general_tools/fastqc.smk"  # rule fastqc
+include: "../../modules/general_tools/trimmomatic.smk"  # rule trimmomatic
+include: "../../modules/genome_analysis/bwa.smk"  # rule bwa
+include: "../../modules/genetic_variation/bcftools.smk"  # rule variantcalling_multipackage
+include: "../../modules/genetic_variation/variant_filtering.smk"  # rule variant_filtering_freebayes
+include: "../../modules/genetic_variation/beagle.smk"  # rule beagle
+include: "../../modules/genetic_variation/gwas.smk"  # rule gwas
+include: "../../modules/genetic_variation/variant_annotation.smk"  # rule variant_annotation
+
+
+# -----------------------------------------------------------------------------
+# Configuration, layered in three deep-merged levels (later layers win).
+# Precedence, low to high:
+#   1. ../../defaults.yaml  shared, author-controlled infrastructure, used by every
+#                           workflow in this repo; NOT exported by dump_config
+#   2. config.yaml          this workflow's params (the dump_config template)
+#   3. --configfile/--config user overrides at run time
+#
+# Do NOT "simplify" this to the native `configfile:` directive. `configfile:`
+# resolves its path relative to the WORKING DIRECTORY, not the Snakefile, so it
+# breaks the two execution modes we support: running `-s /path/to/Snakefile` from
+# another folder, and the no-clone remote run `-s gh:owner/repo@ref:...` (the YAML
+# files aren't in the CWD there at all). `workflow.source_path()` resolves relative
+# to the Snakefile and fetches into the source cache on remote runs, so it works in
+# both. The manual `update_config` calls are what `configfile:` would otherwise do
+# for us (deep-merge CLI overrides on top).
+# -----------------------------------------------------------------------------
+with open(workflow.source_path("../../defaults.yaml")) as _fh:
+    _merged = yaml.safe_load(_fh)
+with open(workflow.source_path("config.yaml")) as _fh:
+    update_config(_merged, yaml.safe_load(_fh))
+update_config(_merged, config)  # --configfile + --config (already merged into `config`)
+config = _merged
+
+# -----------------------------------------------------------------------------
+# Derived globals.
+#
+# ABSOLUTE on purpose (os.path.abspath, resolved against the launch dir): the
+# OmicsBox CLI resolves a relative output folder against ITS OWN install dir
+# (e.g. /OBC/OmicsBoxCli), not the Snakemake working dir - so a relative path
+# would silently write outputs to the wrong place and every step would fail with
+# MissingOutputException.
+# -----------------------------------------------------------------------------
+OUTDIR = os.path.abspath(
+    os.path.join(
+        config["local_folder"], config.get("run_id") or "genetic_variation_analysis"
+    )
+)
+OMICSBOX_IMAGE = config["omicsbox_image"]
+CHART_FORMAT = config["chart_format"]
+
+
+# -----------------------------------------------------------------------------
+# Optional input files (`optional_input()` from common.smk). An empty list means
+# "no file here", so the matching flag is left out of the command; a real path is
+# tracked, so its existence is checked before anything runs.
+# -----------------------------------------------------------------------------
+FASTQC_ADAPTERS = optional_input("fastqc_adapters")
+FASTQC_CONTAMINANTS = optional_input("fastqc_contaminants")
+TRIMMOMATIC_ADAPTERS = optional_input("trimmomatic_adapters")
+
+# Each of these three is paired with a switch in its step's `args`: the file is only
+# read when that switch is on, and turning a switch on without supplying the file
+# leaves the step with nothing to read. The two halves have to agree.
+BCFTOOLS_GROUP = optional_input("bcftools_group_experiment")
+BCFTOOLS_GROUP_FLAG = (
+    f'--i-group-experiment="{BCFTOOLS_GROUP[0]}"' if BCFTOOLS_GROUP else ""
+)
+
+GWAS_KINSHIP = optional_input("gwas_kinship")
+GWAS_KINSHIP_FLAG = f'--i-kinship="{GWAS_KINSHIP[0]}"' if GWAS_KINSHIP else ""
+
+GWAS_COVARIATE = optional_input("gwas_covariate_matrix")
+GWAS_COVARIATE_FLAG = (
+    f'--i-covariate-matrix="{GWAS_COVARIATE[0]}"' if GWAS_COVARIATE else ""
+)
+
+
+# Reads: `raw_reads`/`single_end` (common.smk) resolve the `input_single_end` /
+# `input_paired_end` globs - exactly one must be given, and which one tells the
+# tools whether to expect read pairs.
+SINGLE_END = single_end()
+
+
+# The reference genome is shared by three steps: the alignment, the variant calling and
+# the annotation. All three must see the same sequences, so they read one setting.
+def _reference(wildcards=None):
+    return os.path.abspath(
+        require("input_fasta", "path to the reference genome FASTA")
+    )
+
+
+# Global container default. Honoured only with `--sdm apptainer`; otherwise the host
+# `omicsbox` is used.
+container: OMICSBOX_IMAGE
+
+
+# -----------------------------------------------------------------------------
+# Default target - terminal outputs (drives the whole DAG).
+#
+# This is the switchboard: a step runs only if its output is requested, so listing a
+# terminal output here enables that step and removing it disables the step (and any
+# upstream step no other target needs). The two QC steps are leaves on purpose -
+# nothing consumes their reports - and the association study and the variant
+# annotation are the two ends of the pipeline.
+# -----------------------------------------------------------------------------
+rule all:
+    default_target: True
+    input:
+        os.path.join(stage("fastqc_raw"), "fastqc_report.box"),
+        os.path.join(stage("fastqc_raw"), "quality_assessment.box"),
+        os.path.join(stage("fastqc_post"), "fastqc_report.box"),
+        os.path.join(stage("fastqc_post"), "quality_assessment.box"),
+        os.path.join(stage("gwas"), "gwas_results.box"),
+        os.path.join(stage("gwas"), "gwas_report.box"),
+        os.path.join(stage("variant_annotation"), "Variant_Annotation_Table.box"),
+        os.path.join(stage("variant_annotation"), "Variant_Annotation_Report.box"),
+
+
+# -----------------------------------------------------------------------------
+# Wire each step (topological order, so rules.<upstream>.output resolves).
+# -----------------------------------------------------------------------------
+
+
+# 01 - Quality assessment of the raw reads. A leaf: its reports are for the user to
+# read, nothing downstream consumes them.
+use rule fastqc as fastqc_raw with:
+    input:
+        reads=raw_reads,
+        adapters=FASTQC_ADAPTERS,
+        contaminants=FASTQC_CONTAMINANTS,
+    output:
+        report=os.path.join(stage("fastqc_raw"), "fastqc_report.box"),
+        quality=os.path.join(stage("fastqc_raw"), "quality_assessment.box"),
+    log:
+        logfile("fastqc_raw"),
+    params:
+        outdir=stage("fastqc_raw"),
+        args=join_args("fastqc_raw"),
+
+
+# 02 - Trimming. Writes the trimmed reads plus its own report into one folder; the
+# reads land at the folder root and any unpaired mates in an `unpaired/` sub-folder.
+use rule trimmomatic as trimmomatic_step with:
+    input:
+        reads=raw_reads,
+        adapters=TRIMMOMATIC_ADAPTERS,
+    output:
+        trimmed=directory(stage("trimmomatic")),
+    log:
+        logfile("trimmomatic"),
+    params:
+        single_end=SINGLE_END,
+        up_pattern=config.get("upstream_pattern", "_1"),
+        down_pattern=config.get("downstream_pattern", "_2"),
+        args=join_args("trimmomatic"),
+
+
+# 03 - Quality assessment again, now on the trimmed reads. Same operation as step 01,
+# instantiated a second time with its own input and config. Takes the trimmomatic
+# folder and globs its root, so it sees the trimmed reads and not the unpaired ones.
+use rule fastqc as fastqc_post with:
+    input:
+        reads=rules.trimmomatic_step.output.trimmed,
+        adapters=FASTQC_ADAPTERS,
+        contaminants=FASTQC_CONTAMINANTS,
+    output:
+        report=os.path.join(stage("fastqc_post"), "fastqc_report.box"),
+        quality=os.path.join(stage("fastqc_post"), "quality_assessment.box"),
+    log:
+        logfile("fastqc_post"),
+    params:
+        outdir=stage("fastqc_post"),
+        args=join_args("fastqc_post"),
+
+
+# 04 - Alignment of the trimmed reads to the reference genome. The whole folder is the
+# output: it holds one coordinate-sorted alignment per sample plus this step's report
+# and charts. Per-sample names are chosen by the aligner, so the next step globs the
+# alignments out of it.
+use rule bwa as bwa_step with:
+    input:
+        reference=_reference,
+        reads=rules.trimmomatic_step.output.trimmed,
+    output:
+        directory(stage("bwa")),
+    log:
+        logfile("bwa"),
+    params:
+        single_end=SINGLE_END,
+        up_pattern=config.get("upstream_pattern", "_1"),
+        down_pattern=config.get("downstream_pattern", "_2"),
+        args=join_args("bwa"),
+
+
+# 05 - Variant calling from the alignments, against the same reference genome.
+use rule variantcalling_multipackage as bcftools with:
+    input:
+        bams=rules.bwa_step.output,
+        reference=_reference,
+        group=BCFTOOLS_GROUP,
+    output:
+        vcf=os.path.join(stage("bcftools"), "dir-save.vcf.gz"),
+        report=os.path.join(stage("bcftools"), "Variant_Calling_Report.box"),
+    log:
+        logfile("bcftools"),
+    params:
+        outdir=stage("bcftools"),
+        chart_format=CHART_FORMAT,
+        group_flag=BCFTOOLS_GROUP_FLAG,
+        args=join_args("bcftools"),
+
+
+# 06 - Variant filtering by quality, depth, allele frequency and missingness. Its
+# output feeds two branches: the phasing chain below, and the annotation at step 09.
+use rule variant_filtering_freebayes as variant_filtering with:
+    input:
+        vcf=rules.bcftools.output.vcf,
+    output:
+        vcf=os.path.join(stage("variant_filtering"), "dir-save.vcf.gz"),
+        report=os.path.join(stage("variant_filtering"), "Variant_Filtering_Report.box"),
+    log:
+        logfile("variant_filtering"),
+    params:
+        outdir=stage("variant_filtering"),
+        chart_format=CHART_FORMAT,
+        args=join_args("variant_filtering"),
+
+
+# 07 - Genotype phasing and imputation, producing the variants the association study
+# reads.
+use rule beagle as beagle_step with:
+    input:
+        vcf=rules.variant_filtering.output.vcf,
+    output:
+        vcf=os.path.join(stage("beagle"), "out.vcf.gz"),
+        report=os.path.join(stage("beagle"), "Beagle_Report.box"),
+    log:
+        logfile("beagle"),
+    params:
+        outdir=stage("beagle"),
+        args=join_args("beagle"),
+
+
+# 08 - Association study between the phased genotypes and the phenotypic traits.
+use rule gwas as gwas_step with:
+    input:
+        vcf=rules.beagle_step.output.vcf,
+        pheno=lambda wc: os.path.abspath(
+            require("gwas_input_pheno", "path to the tab-separated traits table")
+        ),
+        kinship=GWAS_KINSHIP,
+        covariate=GWAS_COVARIATE,
+    output:
+        results=os.path.join(stage("gwas"), "gwas_results.box"),
+        report=os.path.join(stage("gwas"), "gwas_report.box"),
+    log:
+        logfile("gwas"),
+    params:
+        outdir=stage("gwas"),
+        kinship_flag=GWAS_KINSHIP_FLAG,
+        covariate_flag=GWAS_COVARIATE_FLAG,
+        args=join_args("gwas"),
+
+
+# 09 - Variant annotation, a parallel branch off the filtered variants from step 06.
+use rule variant_annotation as variant_annotation_step with:
+    input:
+        vcf=rules.variant_filtering.output.vcf,
+        annotation=lambda wc: os.path.abspath(
+            require(
+                "variant_annotation_annotation",
+                "path to the annotation GTF, matching the genome species and version",
+            )
+        ),
+        genome=_reference,
+    output:
+        table=os.path.join(stage("variant_annotation"), "Variant_Annotation_Table.box"),
+        report=os.path.join(
+            stage("variant_annotation"), "Variant_Annotation_Report.box"
+        ),
+    log:
+        logfile("variant_annotation"),
+    params:
+        outdir=stage("variant_annotation"),
+        args=join_args("variant_annotation"),
+
+
+# -----------------------------------------------------------------------------
+# Config template export: copies the packaged config.yaml (comments included) into
+# the launch directory so you can edit it and pass it with --configfile.
+#   snakemake -s .../Snakefile dump_config --cores 1
+# -----------------------------------------------------------------------------
+rule dump_config:
+    output:
+        "genetic_variation_analysis.config.yaml",
+    log:
+        logfile("dump_config"),
+    params:
+        src=workflow.source_path("config.yaml"),
+    shell:
+        "cp {params.src} {output} 2> {log} && "
+        'echo "[OK] Template exported to {output} - edit it and run with '
+        '--configfile {output}"'
