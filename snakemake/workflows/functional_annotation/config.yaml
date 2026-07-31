@@ -1,0 +1,325 @@
+# =============================================================================
+# FILE: workflows/functional_annotation/config.yaml
+# User-editable configuration for the Functional Annotation pipeline.
+#
+# This is the file `snakemake ... dump_config` exports for you to edit. It holds
+# every user-facing parameter. 
+#
+# HOW TO OVERRIDE:
+#   * copy this file with `snakemake ... dump_config` and edit the copy, then
+#     pass it with `--configfile functional_annotation.config.yaml`
+#   * or override single keys inline: `--config input_fasta=/data/seqs.fasta`
+#
+# Uncomment a list item to enable that flag (parameters blocked by
+# dependencies stay commented until their dependency is turned on).
+# =============================================================================
+
+# ---------------------------------------------------
+# WORKFLOW PARAMETERS
+# ---------------------------------------------------
+input_fasta: null                  # Path to the input multi-FASTA file (REQUIRED at run time)
+chart_format: "box"                # Output chart format for all chart steps: [box, png, pdf, csv]
+
+# --- Optional input files (leave null unless you need them) ---
+go_slim_obo_file: null             # Custom GO-Slim OBO file, consumed by the GO-Slim step
+                                   # (13_go_slim). REQUIRED only if you switch that step to
+                                   # `--option=custom`, which makes OmicsBox ignore
+                                   # `--go-slim-web-file` and expect this file instead.
+                                   # Leave null for the default `--option=web`.
+
+# --- Output location (results go to <local_folder>/<run_id>/) ---
+local_folder: "results"            # Base output directory
+run_id: null                       # Run sub-folder: YOU name the run. null -> the workflow
+                                   # name "functional_annotation". Paths are deterministic, so
+                                   # reusing a run_id resumes it; use a fresh name to isolate a run.
+
+# ---------------------------------------------------
+# PER-RULE CONFIGURATION 
+# =================================================================
+# PHASE 1: INITIALIZATION & PROJECT SETUP
+# =================================================================
+load_fasta:
+  outdir: "01_load_fasta"
+  args:
+    - "--handle-double-ids=replace"   # [skip, replace, add_with_new_id] What to do with duplicated sequence IDs. Default: replace
+    - "--add-description=true"        # [true, false] Add everything after first whitespace in header as description. Default: true
+
+# =================================================================
+# PHASE 2: SEQUENCE HOMOLOGY & GO MAPPING
+# =================================================================
+diamond_blast:
+  outdir: "02_diamond_blast"
+  args:
+    # - "--species=9606"              # Specify taxonomies to blast against (comma-separated string).
+    - "--blast-mode=blastx"           # [blastx, blastp] Default: blastx
+    - "--sensitivity=more_sensitive"  # [fast, mid_sensitive, standard, sensitive, more_sensitive, very_sensitive]
+    # Target BLAST database: [refseq_protein_20250925, refseq_227_20241120, refseq_224_20240711,
+    # refseq_223_20240411, refseq_221_20240109, refseq_220_20230921, refseq_216_20230201,
+    # nr_20250925, nr_20241120, nr_20240711, nr_20240411, nr_20240109, nr_20230921, nr_20230201,
+    # swissprot_20250925, swissprot_20241120, swissprot_20240711, swissprot_20240411,
+    # swissprot_20240109, swissprot_20230921, swissprot_20230201]
+    - "--database=swissprot_20250925"
+    - "--taxa-filter-option=included" # ["included", "excluded"] Use the taxonomy id list to either include or exclude the selected taxonomies.
+    - "--blast-expect-value=1.0E-3"   # Default: 1.0E-3
+    # - "--long-queries=false"        # Set to true to optimize for long sequences (>30 kbp). Only allowed with blastx.
+    - "--number-of-hits=20"           # [integer] Default: 20
+    - "--blast-min-hsplength=33"      # [integer] Default: 33
+    - "--hsp-hit-coverage-cutoff=0"   # [integer] Default: 0
+
+blast_charts:
+  outdir: "02_blast_charts"
+  args:
+    - "--blast-evalue-distribution=true"
+    - "--blast-similarity-distribution=true"
+    - "--blast-species-distribution=true"
+    - "--blast-top-hit-distribution=true"
+    - "--blast-hsp-hit-coverage-distribution=true"
+    - "--blast-hsp-seq-distribution=true"
+    - "--blast-hsp-distribution=true"
+    - "--blast-hit-distribution=true"   # [true, false] Default: false
+
+go_mapping:
+  outdir: "03_go_mapping"
+  args:
+    - "--latest-database-version=true"   # [true, false] Use the latest GOA database version. Default: true
+    # - '--goa-version=""'               # [string] Specify a particular GOA version if latest is set to false.
+
+go_mapping_charts:
+  outdir: "03_go_mapping_charts"
+  args:
+    - "--mapping-go-mapping-distribution=true"                    # [true, false] Default: true
+    - "--mapping-evidence-code-distribution-for-sequences=true"   # [true, false] Default: true
+    - "--mapping-evidence-code-distribution-for-blast-hits=true"  # [true, false] Default: false
+
+# =================================================================
+# PHASE 3: INITIAL TRANSCRIPTOME ANNOTATION
+# =================================================================
+go_annotation:
+  outdir: "04_go_annotation"
+  args:
+    # --- Annotation Configuration ---
+    - "--annot-cut-off=55"                # Threshold score: lowest term per branch over this value. Default: 55
+    - "--go-weight=5"                     # Abstraction factor for parent annotation. Default: 5
+    # - '--species=""'                    # Filter GO by taxonomy.
+    - "--e-value-hit-filter=1.0E-6"       # Pre-filter e-value. Default: 1.0E-6
+    - "--hsp-hit-coverage-cutoff=0"       # Minimum alignment coverage. Default: 0
+    - "--hit-filter=500"                  # Considers only the first N hits. Default: 500
+    - "--only-hits-with-gos=false"        # [true, false]
+    # --- Computational Analysis Evidence Codes ---
+    - "--ec-iss=0.8"
+    - "--ec-iso=0.8"
+    - "--ec-isa=0.8"
+    - "--ec-ism=0.8"
+    - "--ec-igc=0.7"
+    - "--ec-iba=0.8"
+    - "--ec-ibd=0.8"
+    - "--ec-ikr=0.8"
+    - "--ec-ird=0.7"
+    - "--ec-rca=0.8"
+    # --- Experimental Evidence Codes ---
+    - "--ec-ida=1.0"
+    - "--ec-ipi=1.0"
+    - "--ec-imp=1.0"
+    - "--ec-igi=1.0"
+    - "--ec-iep=1.0"
+    - "--ec-exp=1.0"
+    # --- Author Statement Evidence Codes ---
+    - "--ec-tas=0.9"
+    - "--ec-nas=0.8"
+    # --- Curator Statement Evidence Codes ---
+    - "--ec-ic=0.9"
+    - "--ec-nd=0.5"
+    # --- Automatically-Assigned & Obsolete ---
+    - "--ec-iea=0.7"
+    - "--ec-nr=0.0"
+
+blast2go_annotation_charts:
+  outdir: "04_blast2go_annotation_charts"
+  args:
+    - "--annotation-distribution=true"                        # [true, false] Default: true
+    - "--go-annotation-level-distribution=true"               # [true, false] Default: false
+    - "--annotation-score-distribution=true"                  # [true, false] Default: false
+    - "--relation-seq-length-annots-statistics-relative=true" # [true, false] Annotated Seqs/Seq-Length. Default: false
+    - "--relation-seq-length-annots-statistics-absolute=true" # [true, false] Number of GOs/Seq-Length. Default: false
+    - "--go-distribution-by-level=true"                       # [true, false] Default: false
+    # - "--ontology-level=2"                                  # [integer] GO level for distribution chart. Default: 2
+    # --- Functional Categories (Level 2 Direct Counts) ---
+    - "--go-distribution-mf=true"                             # Molecular Function. Default: false
+    - "--go-distribution-bp=true"                             # Biological Process. Default: false
+    - "--go-distribution-cc=true"                             # Cellular Component. Default: false
+    # --- EC-Code Statistics ---
+    # Turn off EC distribution at this early stage since InterPro/EggNOG are not merged yet.
+    # EC codes are derived in ec_code_mapping (phase 6), after combine_projects and the
+    # InterPro/EggNOG merges, so charting them here would report on incomplete data.
+    # The full EC breakdown is enabled in final_annotation_charts instead.
+    - "--main-level=false"
+    - "--oxidoreductases=false"
+    - "--transferases=false"
+    - "--hydrolases=false"
+    - "--lyases=false"
+    - "--isomerases=false"
+    - "--ligases=false"
+    - "--translocases=false"
+
+# =================================================================
+# PHASE 4: PARALLEL DOMAIN & ORTHOLOGY PREDICTION
+# =================================================================
+interproscan:
+  outdir: "05_interproscan"
+  args:
+    - "--anti-fam=true"          # AntiFam member database. Default: true
+    - "--f-print-scan=true"      # FPrintScan member database. Default: true
+    - "--hmmpfam=true"           # HMMER/Pfam member database. Default: true
+    - "--fun-fam=true"           # FunFam member database. Default: true
+    - "--profile-scan=true"      # ProfileScan member database. Default: true
+    - "--hamap=true"             # HAMAP member database. Default: true
+    - "--pattern-scan=false"     # PatternScan member database. Default: false
+    - "--super-family=true"      # SUPERFAMILY member database. Default: true
+    - "--hmm-panther=true"       # PANTHER member database. Default: true
+    - "--gene3d=true"            # Gene3D member database. Default: true
+    - "--coils=false"            # Coils member database. Default: false
+    - "--cdd=true"               # CDD member database. Default: true
+    - "--sfld=true"              # SFLD member database. Default: true
+    - "--pirsr=true"             # PIRSR member database. Default: true
+    - "--pirsf=true"             # PIRSF member database. Default: true
+    - "--ncbi-fam=true"          # NCBIfam member database. Default: true
+    - "--export-format=xml,gff3" # [xml, gff3, tsv, ...] Output export formats. Default: xml,gff3
+
+ips_charts:
+  outdir: "05_ips_charts"
+  args:
+    - "--interpro-results=true"        # Generate InterPro Results chart. Default: true
+    - "--interpro-families=true"       # Generate InterPro Families chart. Default: true
+    - "--interpro-domains=true"        # Generate InterPro Domains chart. Default: false
+    - "--interpro-repeats=true"        # Generate InterPro Repeats chart. Default: false
+    - "--interpro-sites=true"          # Generate InterPro Sites chart. Default: false
+    - "--interpro-ids=true"            # Generate InterPro IDs chart. Default: false
+    - "--interpro-by-application=true" # Group charts by application. Default: false
+    # [BlastProDom, FPrintScan, PIR, Pfam, Smart, Tigr, ProfileScan, HAMAP, SuperFamily, Panther, Gene3D]
+    # Application filter for the by-application chart. Default: BlastProDom.
+    # Set to 'Pfam' to match --hmmpfam=true in the interproscan step above: the BlastProDom
+    # default has no corresponding member-database switch in that step, so the chart would be
+    # built from an application that was never run and would come out empty.
+    - "--application=Pfam"
+
+eggnog_mapper:
+  outdir: "06_eggnog_mapper"
+  args:
+    - "--taxonomic-scope=auto"        # Taxonomic scope for annotation. Default: auto
+    - "--target-orthologs=all"        # [all, one2one, many2one, one2many, many2many] Default: all
+    - "--go-evidence=non-electronic"  # [experimental, non-electronic] GO evidence type filter. Default: non-electronic
+    - "--i-type-options=genes"        # [cds, genes, proteins] Input sequence type. Default: genes
+    - "--blast-expect-value=1.0E-3"   # E-value threshold for BLAST. Default: 1.0E-3
+
+# =================================================================
+# PHASE 5: MULTI-OMICS PROJECT MERGING & CONSOLIDATION
+# =================================================================
+combine_projects:
+  outdir: "07_combine_projects"
+  args:
+    - "--merge-sequence-data=add"        # [add, skip, replace] Default: add
+    - "--merge-sequence-description=add" # [add, skip, replace] Default: add
+    - "--merge-blast-go-mapping=add"     # [add, skip, replace] Default: add
+    - "--merge-go-annotation=add"        # [add, skip, replace] Default: add
+    - "--merge-ips-annotation=add"       # [add, skip, replace] Default: add
+    - "--main-project=project1"          # [project1, project2] Default: project1
+
+merge_ips_gos_to_annotation:
+  outdir: "08_merge_ips"
+  args: []
+
+merge_eggnog_5_gos:
+  outdir: "09_merge_eggnog"
+  args:
+    - "--evalue-filter=10"       # Discard protein match alignments with a higher E-Value. Default: 10
+    - "--bit-score-filter=10.0"  # Discard protein match alignments with a lower bit-score. Default: 10.0
+
+# =================================================================
+# PHASE 6: FINAL CURATION, EC MAPPING & REPORTING
+# =================================================================
+validate_go_annotation:
+  outdir: "10_validate_go"
+  args: []
+
+ec_code_mapping:
+  outdir: "11_ec_code_mapping"
+  args: []   # No configurable parameters.
+
+final_annotation_charts:
+  outdir: "12_final_annotation_charts"
+  args:
+    - "--annotation-distribution=true"
+    - "--go-annotation-level-distribution=true"
+    - "--annotation-score-distribution=true"
+    - "--relation-seq-length-annots-statistics-relative=true"
+    - "--relation-seq-length-annots-statistics-absolute=true"
+    - "--go-distribution-by-level=true"
+    # - "--ontology-level=2"
+    # --- Functional Categories (Level 2 Direct Counts) ---
+    - "--go-distribution-mf=true"   # Molecular Function. Default: true
+    - "--go-distribution-bp=true"   # Biological Process. Default: true
+    - "--go-distribution-cc=true"   # Cellular Component. Default: true
+    # Full functional data is now integrated; enable all EC distribution charts
+    - "--main-level=true"
+    - "--oxidoreductases=true"
+    - "--transferases=true"
+    - "--hydrolases=true"
+    - "--lyases=true"
+    - "--isomerases=true"
+    - "--ligases=true"
+    - "--translocases=true"
+
+project_charts:
+  outdir: "12_project_charts"
+  args:
+    - "--data-distribution=true"           # Generate data distribution chart. Default: true
+    - "--data-distribution-pie-chart=true" # Generate data distribution pie chart. Default: false
+    - "--analysis-progress=true"           # Generate analysis progress chart. Default: false
+    - "--seq-length=true"                  # Generate sequence length distribution chart. Default: false
+
+combined_go_graph:
+  outdir: "12_combined_go_graph"
+  args:
+    - '--title="Combined GO Graph Analysis"'                                          # Graph title. Default: "Combined Graph"
+    - '--go-categories="biological_process,molecular_function,cellular_component"'    # GO ontology categories to include.
+
+export_gene_sets:
+  outdir: "12_export_genesets"
+  args:
+    - "--propagated=false"   # [true, false] Export propagated annotations. Default: false (direct only)
+
+go_slim:
+  outdir: "13_go_slim"
+  args:
+    - "--option=web"               # [web, custom] Source for the GO-Slim OBO file. Default: web.
+                                   # If set to 'custom': COMMENT OUT --go-slim-web-file below
+                                   # (custom disables it) and set `go_slim_obo_file` at the top
+                                   # of this file to your own OBO file.
+    - "--go-slim-web-file=generic" # [generic, plant, candida, yeast, protein, pombe, aspergillus,
+                                   # metagenomics, agr, chembl, drosophila, mouse, prokaryote,
+                                   # synapse, virus, ...] GO-Slim subset. Default: generic.
+                                   # (Only when --option=web.)
+
+goslim_annotation_charts:
+  outdir: "13_goslim_charts"
+  # Reuses the statistics-annotation rule; tailored for the GO Slim project.
+  args:
+    - "--annotation-distribution=true"
+    - "--go-annotation-level-distribution=true"
+    - "--annotation-score-distribution=true"
+    - "--relation-seq-length-annots-statistics-relative=true"
+    - "--relation-seq-length-annots-statistics-absolute=true"
+    - "--go-distribution-by-level=true"
+    # - "--ontology-level=2"
+    - "--go-distribution-mf=true"
+    - "--go-distribution-bp=true"
+    - "--go-distribution-cc=true"
+    # Full functional data is now integrated; enable all EC distribution charts
+    - "--main-level=true"
+    - "--oxidoreductases=true"
+    - "--transferases=true"
+    - "--hydrolases=true"
+    - "--lyases=true"
+    - "--isomerases=true"
+    - "--ligases=true"
+    - "--translocases=true"

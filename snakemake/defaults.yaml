@@ -1,0 +1,18 @@
+# =============================================================================
+# FILE: defaults.yaml   (repository root)
+# Shared, author-controlled defaults for EVERY OmicsBox Snakemake workflow.
+# Each workflow's Snakefile loads this file first (before its own config.yaml),
+# so these values apply repo-wide and a NEW workflow never has to redefine them.
+# It is NOT exported by `dump_config`, so it stays out of the file end users edit.
+#
+# Only genuinely global, "don't touch" infrastructure belongs here. User-facing
+# knobs - output location (`local_folder`), run name (`run_id`) and the scientific
+# flags - live in each workflow's `config.yaml`, where the user can see and set them.
+# =============================================================================
+#
+# Container image used only with `--sdm apptainer`; ignored when running the host
+# `omicsbox` (the default). 
+# null because no OmicsBox image is published yet. Note the caveat: with `--sdm apptainer`
+# and no image, Snakemake does NOT error - it silently runs the host CLI instead. Set a
+# real image here (e.g. "docker://...") once one exists.
+omicsbox_image: null

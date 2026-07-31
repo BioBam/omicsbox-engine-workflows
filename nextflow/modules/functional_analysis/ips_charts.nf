@@ -1,0 +1,25 @@
+// --- FILE: modules/functional_analysis/ips_charts.nf ---
+// Wraps: omicsbox statistics-interpro
+// Generates InterProScan domain distribution charts.
+
+process IPS_CHARTS {
+
+    input:
+    path project   // OmicsBox project (.box) with InterProScan results
+
+    output:
+    path "${task.ext.outdir}/*.${params.chart_format}", emit: charts, optional: true   // InterProScan distribution charts
+
+    script:
+    def outdir = task.ext.outdir ?: task.process.toLowerCase()
+    def args = task.ext.args ?: ''
+
+    """
+    mkdir -p ${outdir}
+    omicsbox statistics-interpro \\
+        --i-project=\$PWD/${project} \\
+        --chart-format=${params.chart_format} \\
+        --local-folder=\$PWD/${outdir} \\
+        ${args}
+    """
+}
