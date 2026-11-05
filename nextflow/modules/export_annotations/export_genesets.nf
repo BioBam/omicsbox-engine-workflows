@@ -1,5 +1,5 @@
 // --- FILE: modules/export_annotations/export_genesets.nf ---
-// Wraps: omicsbox export-genesets
+// Wraps: omicsbox export-gene-sets
 // Exports annotated gene sets to standard formats.
 
 process EXPORT_GENE_SETS {
@@ -16,7 +16,7 @@ process EXPORT_GENE_SETS {
 
     """
     mkdir -p ${outdir}
-    omicsbox export-genesets \\
+    omicsbox export-gene-sets \\
         --i-project=\$PWD/${project_file} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

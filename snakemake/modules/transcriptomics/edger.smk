@@ -21,7 +21,7 @@
 #
 # The two names above are STABLE names chosen here, not what the tool writes: both
 # boxes come out with a per-run suffix appended before the extension
-# (`edger_output_project_<id>_<date>_<6 random chars>.box`), whose last characters are
+# (`results_<id>_<date>_<6 random chars>.box`), whose last characters are
 # random and therefore impossible to predict. The rule resolves each by glob and
 # renames it, so downstream steps and `rule all` can refer to a fixed path.
 
@@ -39,7 +39,7 @@ rule edger:
 
             # Both boxes carry an unpredictable per-run suffix; resolve each by glob and
             # rename to the stable name the workflow declared.
-            mv "$(find "{params.outdir}" -maxdepth 1 -name 'edger_output_project_*.box' | head -n1)" "{output.results}"
-            mv "$(find "{params.outdir}" -maxdepth 1 -name 'edger_summary_report_*.box' | head -n1)" "{output.report}"
+            mv "$(find "{params.outdir}" -maxdepth 1 -name 'results*.box' | head -n1)" "{output.results}"
+            mv "$(find "{params.outdir}" -maxdepth 1 -name 'report*.box' | head -n1)" "{output.report}"
         ) >{log} 2>&1
         """

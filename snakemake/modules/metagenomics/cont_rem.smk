@@ -1,5 +1,5 @@
 # --- FILE: modules/metagenomics/cont_rem.smk ---
-# Wraps: omicsbox cont-rem - removes contaminant reads (e.g. host DNA) from a
+# Wraps: omicsbox contaminant-removal - removes contaminant reads (e.g. host DNA) from a
 # sequencing library by aligning against a target genome and keeping one side.
 #
 # Generic, reusable rule (operation = `cont_rem`). Self-contained: the SE/PE branch,
@@ -60,14 +60,19 @@ rule cont_rem:
                 pattern_flags=""
             else
                 input_flag="--sequencing=fastq_pe --i-read-files-paired-end=$reads"
-                pattern_flags="--upstream-pattern-preprocessing={params.up_pattern} --downstream-pattern-preprocessing={params.down_pattern}"
+                pattern_flags="--upstream-pattern={params.up_pattern} --downstream-pattern={params.down_pattern}"
             fi
 
-            omicsbox cont-rem \
+            omicsbox contaminant-removal \
                 $input_flag \
                 $pattern_flags \
                 {params.target_flag} \
                 --local-folder="{output}" \
                 {params.args}
+
+            # Async tools write each folder output into <local-folder>/<output-key>/; the
+            # steps below and downstream rules expect those files at the top of the folder.
+            find "{output}" -mindepth 2 -maxdepth 2 -type f -exec mv -n {{}} "{output}"/ \;
+            find "{output}" -mindepth 1 -type d -empty -delete
         ) >{log} 2>&1
         """

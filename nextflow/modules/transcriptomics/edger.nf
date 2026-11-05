@@ -9,7 +9,7 @@ process EDGER {
     path design_file           // Tab-delimited experimental design file
 
     output:
-    path "${task.ext.outdir}/*output*.box",  emit: results  // EdgeRObject project (pairwise DE results)
+    path "${task.ext.outdir}/*results*.box", emit: results  // EdgeRObject project (pairwise DE results)
     path "${task.ext.outdir}/*report*.box", emit: report   // EdgeR report
 
     script:

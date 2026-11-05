@@ -1,5 +1,5 @@
 # --- FILE: modules/genetic_variation/bcftools.smk ---
-# Wraps: omicsbox variantcalling-multipackage - calls SNPs and indels from BAM
+# Wraps: omicsbox variant-calling-bcftools - calls SNPs and indels from BAM
 # alignments against a reference genome (BCFtools).
 #
 # Generic, reusable rule (operation = `variantcalling_multipackage`). Self-contained:
@@ -45,7 +45,7 @@ rule variantcalling_multipackage:
                 bams=$(echo {input.bams} | tr ' ' ',')
             fi
 
-            omicsbox variantcalling-multipackage \
+            omicsbox variant-calling-bcftools \
                 --i-input-files="$bams" \
                 --i-ref-gen="{input.reference}" \
                 {params.group_flag} \

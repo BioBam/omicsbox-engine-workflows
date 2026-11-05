@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/combined_go_graph.nf ---
-// Wraps: omicsbox graph-combined-make
+// Wraps: omicsbox go-graph-combined
 // Generates combined GO graph visualization.
 
 process COMBINED_GO_GRAPH {
@@ -16,7 +16,7 @@ process COMBINED_GO_GRAPH {
 
     """
     mkdir -p ${outdir}
-    omicsbox graph-combined-make \\
+    omicsbox go-graph-combined \\
         --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

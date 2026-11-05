@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/merge_eggnog_5_gos.nf ---
-// Wraps: omicsbox merge-emapper5-annotations
+// Wraps: omicsbox eggnog-mapper-merge-gos
 // Integrates EggNOG annotations with GO terms.
 
 process MERGE_EGGNOG_5_GOS {
@@ -18,7 +18,7 @@ process MERGE_EGGNOG_5_GOS {
 
     """
     mkdir -p ${outdir}
-    omicsbox merge-emapper5-annotations  \\
+    omicsbox eggnog-mapper-merge-gos  \\
         --i-project=\$PWD/${project} \\
         --i-egg-nog-annotations=\$PWD/${eggnog_project} \\
         --chart-format=${params.chart_format} \\

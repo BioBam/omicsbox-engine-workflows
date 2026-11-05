@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/go_slim.smk ---
-# Wraps: omicsbox goslim - generates a GO-Slim subset annotation.
+# Wraps: omicsbox go-slim - generates a GO-Slim subset annotation.
 #
 # Generic, reusable rule (operation = `goslim`). Instantiate with:
 #   use rule goslim as <step> with:
@@ -19,7 +19,7 @@ rule goslim:
     shell:
         r"""
         (
-            omicsbox goslim \
+            omicsbox go-slim \
                 --i-project="{input.project}" \
                 {params.obo_flag} \
                 --local-folder="{params.outdir}" \

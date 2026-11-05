@@ -63,7 +63,7 @@ terms.
 
 `raw_reads`/`single_end` from `common.smk`, as in the other read-consuming pipelines.
 `bwa` uses plain `--upstream-pattern`/`--downstream-pattern` (the same spelling as
-`megahit` and `star-aligner`, not `trimmomatic`'s `-preprocessing` suffix).
+`megahit` and `star`, not `trimmomatic`'s `-preprocessing` suffix).
 
 ## 4. The reference genome is shared by three steps
 

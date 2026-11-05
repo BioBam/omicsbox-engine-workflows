@@ -1,5 +1,5 @@
 // --- FILE: modules/genetic_variation/bcftools.nf ---
-// Wraps: omicsbox variantcalling-multipackage
+// Wraps: omicsbox variant-calling-bcftools
 // Variant Calling with BCFtools: calls SNPs/indels from BAM alignments against a reference genome.
 
 process BCFTOOLS {
@@ -31,7 +31,7 @@ process BCFTOOLS {
 
     """
     mkdir -p ${outdir}
-    omicsbox variantcalling-multipackage \\
+    omicsbox variant-calling-bcftools \\
         --i-input-files=${bams_list} \\
         --i-ref-gen=\$PWD/${ref_gen} \\
         ${group_flag} \\

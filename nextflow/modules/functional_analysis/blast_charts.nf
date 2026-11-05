@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/blast_charts.nf ---
-// Wraps: omicsbox statistics-blast
+// Wraps: omicsbox blast-charts
 // Generates visualization charts for BLAST hit statistics.
 
 process BLAST_CHARTS {
@@ -16,7 +16,7 @@ process BLAST_CHARTS {
 
     """
     mkdir -p ${outdir}
-    omicsbox statistics-blast \\
+    omicsbox blast-charts \\
         --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

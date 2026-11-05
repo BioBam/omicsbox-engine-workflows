@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/ips.nf ---
-// Wraps: omicsbox ips
+// Wraps: omicsbox interproscan
 // Protein domain and functional annotation via InterProScan.
 
 process INTERPROSCAN {
@@ -20,9 +20,14 @@ process INTERPROSCAN {
 
     """
     mkdir -p ${outdir}
-    omicsbox ips \\
+    omicsbox interproscan \\
         --i-local-project=\$PWD/${omicsbox_project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
+
+    # Async tools write each folder output into ${outdir}/<output-key>/; the output globs
+    # above expect those files at the top of ${outdir}.
+    find ${outdir} -mindepth 2 -maxdepth 2 -type f -exec mv -n {} ${outdir}/ \\;
+    find ${outdir} -mindepth 1 -type d -empty -delete
     """
 }

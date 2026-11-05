@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/merge_eggnog_5_gos.smk ---
-# Wraps: omicsbox merge-emapper5-annotations - integrates EggNOG annotations
+# Wraps: omicsbox eggnog-mapper-merge-gos - integrates EggNOG annotations
 # with GO terms. Two inputs (the upstream project + the EggNOG annotations).
 #
 # Generic, reusable rule (operation = `merge_emapper5_annotations`). Writes a
@@ -15,7 +15,7 @@ rule merge_emapper5_annotations:
     shell:
         r"""
         (
-            omicsbox merge-emapper5-annotations \
+            omicsbox eggnog-mapper-merge-gos \
                 --i-project="{input.project}" \
                 --i-egg-nog-annotations="{input.eggnog}" \
                 --chart-format={params.chart_format} \

@@ -61,6 +61,11 @@ rule trimmomatic:
                 --local-folder="{output.trimmed}" \
                 {params.args}
 
+            # Async tools write each folder output into <local-folder>/<output-key>/; the
+            # steps below and downstream rules expect those files at the top of the folder.
+            find "{output.trimmed}" -mindepth 2 -maxdepth 2 -type f -exec mv -n {{}} "{output.trimmed}"/ \;
+            find "{output.trimmed}" -mindepth 1 -type d -empty -delete
+
             # Isolate unpaired reads into a subfolder ONLY if they exist (paired-end).
             # Single-end produces none, so no (misleading) empty 'unpaired/' folder is created.
             if ls {output.trimmed}/unpaired_*.fastq* >/dev/null 2>&1; then

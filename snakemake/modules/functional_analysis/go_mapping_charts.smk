@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/go_mapping_charts.smk ---
-# Wraps: omicsbox statistics-mapping - GO mapping charts (terminal step).
+# Wraps: omicsbox go-mapping-charts - GO mapping charts (terminal step).
 #
 # Generic, reusable rule (operation = `statistics_mapping`). Instantiate with:
 #   use rule statistics_mapping as <step> with:
@@ -14,7 +14,7 @@ rule statistics_mapping:
         r"""
         (
             mkdir -p {output}
-            omicsbox statistics-mapping \
+            omicsbox go-mapping-charts \
                 --i-project="{input.project}" \
                 --chart-format={params.chart_format} \
                 --local-folder="{output}" \

@@ -55,6 +55,11 @@ process TRIMMOMATIC {
         --local-folder=\$PWD/${outdir} \\
         ${args}
 
+    # Async tools write each folder output into ${outdir}/<output-key>/; the output globs
+    # above expect those files at the top of ${outdir}.
+    find ${outdir} -mindepth 2 -maxdepth 2 -type f -exec mv -n {} ${outdir}/ \\;
+    find ${outdir} -mindepth 1 -type d -empty -delete
+
     # Physically isolate unpaired files in a subfolder
     # The '2>/dev/null || true' prevents failure if no unpaired files exist (single-end reads)
     mkdir -p ${outdir}/unpaired

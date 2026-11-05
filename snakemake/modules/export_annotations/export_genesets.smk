@@ -1,5 +1,5 @@
 # --- FILE: modules/export_annotations/export_genesets.smk ---
-# Wraps: omicsbox export-genesets - exports annotated gene sets (terminal step).
+# Wraps: omicsbox export-gene-sets - exports annotated gene sets (terminal step).
 #
 # Generic, reusable rule (operation = `export_genesets`). No --chart-format.
 # Instantiate with:
@@ -20,7 +20,7 @@ rule export_genesets:
     shell:
         r"""
         (
-            omicsbox export-genesets \
+            omicsbox export-gene-sets \
                 --i-project="{input.project}" \
                 --local-folder="{params.outdir}" \
                 {params.args}

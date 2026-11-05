@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/go_slim.nf ---
-// Wraps: omicsbox goslim
+// Wraps: omicsbox go-slim
 // Generates GO Slim subset annotation.
 
 process GO_SLIM {
@@ -24,7 +24,7 @@ process GO_SLIM {
 
     """
     mkdir -p ${outdir}
-    omicsbox goslim \\
+    omicsbox go-slim \\
         --i-project=\$PWD/${project_file} \\
         ${obo_flag} \\
         --local-folder=\$PWD/${outdir} \\

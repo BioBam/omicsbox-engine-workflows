@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/go_mapping_charts.nf ---
-// Wraps: omicsbox statistics-mapping
+// Wraps: omicsbox go-mapping-charts
 // Generates GO mapping distribution charts.
 
 process GO_MAPPING_CHARTS {
@@ -16,7 +16,7 @@ process GO_MAPPING_CHARTS {
 
     """
     mkdir -p ${outdir}
-    omicsbox statistics-mapping \\
+    omicsbox go-mapping-charts \\
         --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

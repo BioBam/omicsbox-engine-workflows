@@ -1,5 +1,5 @@
 // --- FILE: modules/transcriptomics/star.nf ---
-// Wraps: omicsbox star-aligner
+// Wraps: omicsbox star
 // RNA-Seq read alignment to reference genome using STAR aligner.
 
 process STAR {
@@ -55,13 +55,18 @@ process STAR {
 
     """
     mkdir -p ${outdir}
-    omicsbox star-aligner \\
+    omicsbox star \\
         ${input_flag} \\
         ${pattern_flags} \\
         --i-fasta-file=\$PWD/${fasta} \\
         ${annotation_flag} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
+
+    # Async tools write each folder output into ${outdir}/<output-key>/; the output globs
+    # above expect those files at the top of ${outdir}.
+    find ${outdir} -mindepth 2 -maxdepth 2 -type f -exec mv -n {} ${outdir}/ \\;
+    find ${outdir} -mindepth 1 -type d -empty -delete
 
     # HTSEQ derives its sample name by stripping ONLY the .bam extension from the alignment
     # filename - it does not know STAR's own output-naming convention.

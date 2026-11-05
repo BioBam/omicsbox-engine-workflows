@@ -1,5 +1,5 @@
 // --- FILE: modules/transcriptomics/cdhit.nf ---
-// Wraps: omicsbox cdhit
+// Wraps: omicsbox cd-hit
 // Clusters transcript sequences by sequence identity to remove redundancy.
 
 process CDHIT {
@@ -20,7 +20,7 @@ process CDHIT {
 
     """
     mkdir -p ${outdir}
-    omicsbox cdhit \\
+    omicsbox cd-hit \\
         --i-input=\$PWD/${assembly} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

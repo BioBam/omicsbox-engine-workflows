@@ -46,13 +46,13 @@ needed.
 `raw_reads`/`single_end` from `common.smk`, as in the other read-consuming pipelines.
 
 ⚠️ **Three different spellings of the read-pair pattern flags appear in this repo and are
-not interchangeable.** `trimmomatic` and `cont-rem` both use
-`--upstream-pattern-preprocessing` / `--downstream-pattern-preprocessing`; `megahit` and
-`star-aligner` use plain `--upstream-pattern` / `--downstream-pattern`; `rsem` uses
+not interchangeable.** `trimmomatic` uses
+`--upstream-pattern-preprocessing` / `--downstream-pattern-preprocessing`; `contaminant-removal`,
+`megahit` and `star` use plain `--upstream-pattern` / `--downstream-pattern`; `rsem` uses
 `--upstream-pattern-counts`. Each module hardcodes its own; the workflow only supplies
 the raw `up_pattern`/`down_pattern` values.
 
-`cont-rem` and `megahit` also disagree on the *sequencing mode* flag:
+`contaminant-removal` and `megahit` also disagree on the *sequencing mode* flag:
 `--sequencing=fastq_se|fastq_pe` for the former, `--sequencing=single|paired` for the
 latter.
 
@@ -81,7 +81,7 @@ upstream comment may be recording a CLI behaviour that has since changed.
 
 ## 4. `reads_glob` — why `megahit` takes the glob as a parameter
 
-`cont-rem` writes **both** read sets into its single output folder, one file per sample:
+`contaminant-removal` writes **both** read sets into its single output folder, one file per sample:
 
 ```
 04_contaminant_removal/un_*.fq.gz              reads that did NOT match the target: the clean set
@@ -171,7 +171,7 @@ confirms them.
 
 Three things to watch on that first run:
 
-- **`cont-rem`'s per-sample read filenames.** `OUTPUT_FILENAMES.md` gives the prefixes as
+- **`contaminant-removal`'s per-sample read filenames.** `OUTPUT_FILENAMES.md` gives the prefixes as
   `un_`/`al_` with a `.fq.gz` extension; `megahit_step`'s `reads_glob` assumes exactly
   `un_*.fq.gz`. If the extension differs (e.g. `.fastq.gz`), the glob returns nothing and
   the step fails loudly rather than assembling the wrong thing — which is the intended

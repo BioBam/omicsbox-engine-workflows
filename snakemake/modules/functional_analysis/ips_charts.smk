@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/ips_charts.smk ---
-# Wraps: omicsbox statistics-interpro - InterProScan charts (terminal step).
+# Wraps: omicsbox interproscan-charts - InterProScan charts (terminal step).
 #
 # Generic, reusable rule (operation = `statistics_interpro`). Instantiate with:
 #   use rule statistics_interpro as <step> with:
@@ -14,7 +14,7 @@ rule statistics_interpro:
         r"""
         (
             mkdir -p {output}
-            omicsbox statistics-interpro \
+            omicsbox interproscan-charts \
                 --i-project="{input.project}" \
                 --chart-format={params.chart_format} \
                 --local-folder="{output}" \

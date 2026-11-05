@@ -68,6 +68,11 @@ rule rsem:
                 --local-folder="{params.outdir}" \
                 {params.args}
 
+            # Async tools write each folder output into <local-folder>/<output-key>/; the
+            # steps below and downstream rules expect those files at the top of the folder.
+            find "{params.outdir}" -mindepth 2 -maxdepth 2 -type f -exec mv -n {{}} "{params.outdir}"/ \;
+            find "{params.outdir}" -mindepth 1 -type d -empty -delete
+
             # The report name carries an unpredictable per-run suffix; resolve and rename it.
             mv "$(find "{params.outdir}" -maxdepth 1 -name 'transcript_quantification_report_*.box' | head -n1)" "{output.report}"
         ) >{log} 2>&1
