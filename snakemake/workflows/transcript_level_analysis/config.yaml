@@ -164,7 +164,7 @@ counts_pca:
   outdir: "05_counts_pca"
   args:
     # -- Color Options -- (only meaningful while counts_pca_use_design is true)
-    # - "--factor=Sample"                    # Experimental factor for PCA coloring
+    # - "--factor=Sample"                    # REQUIRED while counts_pca_use_design is true: a column header of the design file (counts-pca fails without it)
     # - "--paired-factor=Condition"          # Secondary factor for combined coloring
     # - "--combine=false"                    # [true, false] Combine two factors into subgroups
     - "--enable3d=false"                     # [true, false] Enable 3D PCA visualization. Default: false
