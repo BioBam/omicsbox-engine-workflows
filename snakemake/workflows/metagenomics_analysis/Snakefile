@@ -230,7 +230,7 @@ use rule megahit as megahit_step with:
     output:
         contigs=os.path.join(stage("megahit"), "megahit-contigs.fasta"),
         report=os.path.join(stage("megahit"), "megahit_report.box"),
-        nx_plot=os.path.join(stage("megahit"), f"nx-plot.{CHART_FORMAT}"),
+        nx_plot=os.path.join(stage("megahit"), "megahit_chart.box"),
     log:
         logfile("megahit"),
     params:
