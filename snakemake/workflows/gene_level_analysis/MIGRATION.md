@@ -120,6 +120,8 @@ suffix); STAR's three `.box` names from `StarWorkflow.java:134-136`.
 
 ## 7. Not verified statically
 
+A real run on small test inputs (November 2026, OmicsBox CLI 4.2) completed every step, from Trimmomatic through STAR, HTSeq, counts PCA and edgeR, and the output names above matched. The points below were the open questions before that run.
+
 Everything above is derived from the Engine source and checked with dry runs; no cloud job
 was run. The output names come from `OUTPUT_FILENAMES.md` (statically derived from
 `omicsbox-bnd`, with the source class cited per entry), so the first real run is what

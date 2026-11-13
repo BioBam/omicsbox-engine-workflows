@@ -137,6 +137,8 @@ inside `fastqc.smk`.
 
 ## 7. Not verified statically
 
+A real run on small test inputs (November 2026, OmicsBox CLI 4.2) completed every step, from Trimmomatic through RSEM, counts PCA and edgeR, and the output names above, including the six `find`/`mv` globs, matched.
+
 Everything above is derived from the Engine source and checked with dry runs; no cloud job
 was run. The output names come from `OUTPUT_FILENAMES.md` (statically derived from
 `omicsbox-bnd`, with the source class cited per entry), so the first real run is what

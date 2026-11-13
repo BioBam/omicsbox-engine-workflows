@@ -165,6 +165,8 @@ All four still land in their step folders; they are just not part of the DAG con
 
 ## 7. Not verified statically
 
+A real run on small test inputs (November 2026, OmicsBox CLI 4.2) completed every step through variant annotation, and the output names above, including `dir-save.vcf.gz`, matched. GWAS ran and stopped with "Not enough samples in your VCF after filtering", the tool's answer for an eight-sample test set rather than a wiring problem; a real cohort or less restrictive filters get past it. The points below were the open questions before that run.
+
 Everything above is derived from the Engine source and checked with dry runs; no cloud job
 was run. The output names come from `OUTPUT_FILENAMES.md` (statically derived from
 `omicsbox-bnd`, with the source class cited per entry), so the first real run is what
