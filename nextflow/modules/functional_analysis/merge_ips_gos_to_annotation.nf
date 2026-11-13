@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/merge_ips_gos_to_annotation.nf ---
-// Wraps: omicsbox interproscan-join
+// Wraps: omicsbox interproscan-merge-gos
 // Merges InterPro domains into GO annotations.
 
 process MERGE_IPS_GOS_TO_ANNOTATION {
@@ -17,7 +17,7 @@ process MERGE_IPS_GOS_TO_ANNOTATION {
 
     """
     mkdir -p ${outdir}
-    omicsbox interproscan-join \\
+    omicsbox interproscan-merge-gos \\
         --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

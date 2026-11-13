@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/merge_ips_gos_to_annotation.smk ---
-# Wraps: omicsbox interproscan-join - merges InterPro domains into GO annotations.
+# Wraps: omicsbox interproscan-merge-gos - merges InterPro domains into GO annotations.
 #
 # Generic, reusable rule (operation = `interproscan_join`). Writes a project box
 # plus a named chart (both declared exactly in the workflow). Instantiate:
@@ -14,7 +14,7 @@ rule interproscan_join:
     shell:
         r"""
         (
-            omicsbox interproscan-join \
+            omicsbox interproscan-merge-gos \
                 --i-project="{input.project}" \
                 --chart-format={params.chart_format} \
                 --local-folder="{params.outdir}" \

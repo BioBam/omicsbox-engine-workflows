@@ -11,7 +11,7 @@
 #       output:
 #           contigs=os.path.join(stage("<step>"), "megahit-contigs.fasta"),
 #           report=os.path.join(stage("<step>"), "megahit_report.box"),
-#           nx_plot=os.path.join(stage("<step>"), f"nx-plot.{CHART_FORMAT}"),
+#           nx_plot=os.path.join(stage("<step>"), "megahit_chart.box"),
 #       params:
 #           single_end="true" if config["input_single_end"] else "false",
 #           up_pattern=config.get("upstream_pattern", "_1"),
@@ -24,8 +24,7 @@
 #           logfile("<step>")
 #
 # All three output names are fixed, so they are declared exactly and no renaming is
-# needed. `nx-plot` is named after its chart title, so its extension follows the
-# configured chart format.
+# needed. MEGAHIT has no --chart-format, so its chart is always megahit_chart.box.
 #
 # TWO details that differ from the other read-consuming tools:
 #
@@ -69,7 +68,6 @@ rule megahit:
                 $seq_flag \
                 $read_flags \
                 $pattern_flags \
-                --chart-format="{params.chart_format}" \
                 --local-folder="{params.outdir}" \
                 {params.args}
         ) >{log} 2>&1

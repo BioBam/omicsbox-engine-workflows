@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/project_charts.nf ---
-// Wraps: omicsbox statistics-project
+// Wraps: omicsbox sequence-project-charts
 // Generates overall project statistics charts.
 
 process PROJECT_CHARTS {
@@ -16,7 +16,7 @@ process PROJECT_CHARTS {
 
     """
     mkdir -p ${outdir}
-    omicsbox statistics-project \\
+    omicsbox sequence-project-charts \\
         --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

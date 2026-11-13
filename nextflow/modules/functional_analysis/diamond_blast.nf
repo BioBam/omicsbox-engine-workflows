@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/diamond_blast.nf ---
-// Wraps: omicsbox diamond
+// Wraps: omicsbox blast-diamond
 // Sequence similarity search via DIAMOND BLAST.
 
 process DIAMOND_BLAST {
@@ -17,7 +17,7 @@ process DIAMOND_BLAST {
 
     """
     mkdir -p ${outdir}
-    omicsbox diamond \\
+    omicsbox blast-diamond \\
         --i-local-project=\$PWD/${omicsbox_project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

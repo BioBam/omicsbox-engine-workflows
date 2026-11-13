@@ -1,5 +1,5 @@
 # --- FILE: modules/utilities/combine_projects.smk ---
-# Wraps: omicsbox combine-projects - merges two OmicsBox projects into one.
+# Wraps: omicsbox merge-projects - merges two OmicsBox projects into one.
 #
 # Generic, reusable rule (operation = `combine_projects`). Two inputs. Instantiate:
 #   use rule combine_projects as <step> with:
@@ -14,7 +14,7 @@ rule combine_projects:
     shell:
         r"""
         (
-            omicsbox combine-projects \
+            omicsbox merge-projects \
                 --i-project1="{input.project1}" \
                 --i-project2="{input.project2}" \
                 --local-folder="{params.outdir}" \

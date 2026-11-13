@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/go_annotation_charts.nf ---
-// Wraps: omicsbox statistics-annotation
+// Wraps: omicsbox go-annotation-charts
 // Generates GO annotation distribution charts.
 
 process GO_ANNOTATION_CHARTS {
@@ -16,7 +16,7 @@ process GO_ANNOTATION_CHARTS {
 
     """
     mkdir -p ${outdir}
-    omicsbox statistics-annotation \\
+    omicsbox go-annotation-charts \\
         --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

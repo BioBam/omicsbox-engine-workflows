@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/ips.smk ---
-# Wraps: omicsbox ips - protein domain annotation via InterProScan.
+# Wraps: omicsbox interproscan - protein domain annotation via InterProScan.
 #
 # Generic, reusable rule (operation = `ips`). Instantiate with:
 #   use rule ips as <step> with:
@@ -15,9 +15,14 @@ rule ips:
     shell:
         r"""
         (
-            omicsbox ips \
+            omicsbox interproscan \
                 --i-local-project="{input.project}" \
                 --local-folder="{params.outdir}" \
                 {params.args}
+
+            # Async tools write each folder output into <local-folder>/<output-key>/; the
+            # steps below and downstream rules expect those files at the top of the folder.
+            find "{params.outdir}" -mindepth 2 -maxdepth 2 -type f -exec mv -n {{}} "{params.outdir}"/ \;
+            find "{params.outdir}" -mindepth 1 -type d -empty -delete
         ) >{log} 2>&1
         """

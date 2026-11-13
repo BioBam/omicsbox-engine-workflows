@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/blast_charts.smk ---
-# Wraps: omicsbox statistics-blast - DIAMOND BLAST charts (terminal step).
+# Wraps: omicsbox blast-charts - DIAMOND BLAST charts (terminal step).
 #
 # Generic, reusable rule (operation = `statistics_blast`). Instantiate with:
 #   use rule statistics_blast as <step> with:
@@ -17,7 +17,7 @@ rule statistics_blast:
         r"""
         (
             mkdir -p {output}
-            omicsbox statistics-blast \
+            omicsbox blast-charts \
                 --i-project="{input.project}" \
                 --chart-format={params.chart_format} \
                 --local-folder="{output}" \

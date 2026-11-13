@@ -1,5 +1,5 @@
 // --- FILE: modules/genome_analysis/augustus.nf ---
-// Wraps: omicsbox genefinding-eukaryotic
+// Wraps: omicsbox augustus
 // Eukaryotic gene finding using AUGUSTUS with evidence-based prediction.
 
 process AUGUSTUS {
@@ -58,7 +58,7 @@ process AUGUSTUS {
 
     """
     mkdir -p ${outdir}
-    omicsbox genefinding-eukaryotic \\
+    omicsbox augustus \\
         --i-input-sequences=\$PWD/${fasta} \\
         ${mode_flag} \\
         ${est_flag} \\

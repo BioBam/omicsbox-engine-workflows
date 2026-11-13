@@ -10,7 +10,7 @@ process MEGAHIT {
     output:
     path "${task.ext.outdir}/*contigs*.fasta", emit: contigs                 // Assembled contigs FASTA
     path "${task.ext.outdir}/*report*.box", emit: report                     // MEGAHIT report
-    path "${task.ext.outdir}/nx-plot.${params.chart_format}", emit: nx_plot  // Nx plot chart
+    path "${task.ext.outdir}/megahit_chart.box", emit: nx_plot       // Nx plot chart (the tool has no --chart-format)
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
@@ -40,7 +40,6 @@ process MEGAHIT {
         ${seq_flag} \\
         ${input_flag} \\
         ${pattern_flags} \\
-        --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

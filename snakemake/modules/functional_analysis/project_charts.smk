@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/project_charts.smk ---
-# Wraps: omicsbox statistics-project - overall project statistics charts.
+# Wraps: omicsbox sequence-project-charts - overall project statistics charts.
 #
 # Generic, reusable rule (operation = `statistics_project`). Instantiate with:
 #   use rule statistics_project as <step> with:
@@ -14,7 +14,7 @@ rule statistics_project:
         r"""
         (
             mkdir -p {output}
-            omicsbox statistics-project \
+            omicsbox sequence-project-charts \
                 --i-project="{input.project}" \
                 --chart-format={params.chart_format} \
                 --local-folder="{output}" \

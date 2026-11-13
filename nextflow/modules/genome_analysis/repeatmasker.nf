@@ -12,7 +12,7 @@ process REPEATMASKER {
     path "${task.ext.outdir}/output-repeat-masker.fasta", emit: masked_fasta                             // Soft-masked genome FASTA
     path "${task.ext.outdir}/*gff*.box", emit: gff_repeats                                               // Repeat annotations (GFF exported as .box)
     path "${task.ext.outdir}/*report*.box", emit: report                                                 // RepeatMasker report
-    path "${task.ext.outdir}/repeat-type-distribution.${params.chart_format}", emit: distribution        // Repeat-type distribution chart
+    path "${task.ext.outdir}/*chart*.box", emit: distribution                                            // Repeat-type distribution chart (always .box: repeatmasker has no --chart-format)
 
     script:
     def outdir = task.ext.outdir ?: task.process.toLowerCase()
@@ -38,7 +38,6 @@ process REPEATMASKER {
         ${engine_flag} \\
         ${db_type_flag} \\
         ${db_file_flag} \\
-        --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
     """

@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/go_mapping.nf ---
-// Wraps: omicsbox mapping-cloud
+// Wraps: omicsbox go-mapping
 // Maps sequences to Gene Ontology terms.
 
 process GO_MAPPING {
@@ -16,7 +16,7 @@ process GO_MAPPING {
 
     """
     mkdir -p ${outdir}
-    omicsbox mapping-cloud \\
+    omicsbox go-mapping \\
         --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

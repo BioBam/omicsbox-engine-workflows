@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/ec_code_mapping.nf ---
-// Wraps: omicsbox enzymecode
+// Wraps: omicsbox enzyme-code-mapping
 // Maps Enzyme Commission codes from GO annotations.
 
 process EC_CODE_MAPPING {
@@ -16,7 +16,7 @@ process EC_CODE_MAPPING {
 
     """
     mkdir -p ${outdir}
-    omicsbox enzymecode \\
+    omicsbox enzyme-code-mapping \\
         --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

@@ -87,8 +87,8 @@ go_mapping:
 go_mapping_charts:
   outdir: "03_go_mapping_charts"
   args:
-    - "--mapping-go-mapping-distribution=true"                    # [true, false] Default: true
-    - "--mapping-evidence-code-distribution-for-sequences=true"   # [true, false] Default: true
+    - "--mapping-go-mapping-distribution=true"                    # [true, false] Default: false
+    - "--mapping-evidence-code-distribution-for-sequences=true"   # [true, false] Default: false
     - "--mapping-evidence-code-distribution-for-blast-hits=true"  # [true, false] Default: false
 
 # =================================================================
@@ -136,7 +136,7 @@ go_annotation:
 blast2go_annotation_charts:
   outdir: "04_blast2go_annotation_charts"
   args:
-    - "--annotation-distribution=true"                        # [true, false] Default: true
+    - "--annotation-distribution=true"                        # [true, false] Default: false
     - "--go-annotation-level-distribution=true"               # [true, false] Default: false
     - "--annotation-score-distribution=true"                  # [true, false] Default: false
     - "--relation-seq-length-annots-statistics-relative=true" # [true, false] Annotated Seqs/Seq-Length. Default: false
@@ -188,8 +188,8 @@ interproscan:
 ips_charts:
   outdir: "05_ips_charts"
   args:
-    - "--interpro-results=true"        # Generate InterPro Results chart. Default: true
-    - "--interpro-families=true"       # Generate InterPro Families chart. Default: true
+    - "--interpro-results=true"        # Generate InterPro Results chart. Default: false
+    - "--interpro-families=true"       # Generate InterPro Families chart. Default: false
     - "--interpro-domains=true"        # Generate InterPro Domains chart. Default: false
     - "--interpro-repeats=true"        # Generate InterPro Repeats chart. Default: false
     - "--interpro-sites=true"          # Generate InterPro Sites chart. Default: false
@@ -256,9 +256,9 @@ final_annotation_charts:
     - "--go-distribution-by-level=true"
     # - "--ontology-level=2"
     # --- Functional Categories (Level 2 Direct Counts) ---
-    - "--go-distribution-mf=true"   # Molecular Function. Default: true
-    - "--go-distribution-bp=true"   # Biological Process. Default: true
-    - "--go-distribution-cc=true"   # Cellular Component. Default: true
+    - "--go-distribution-mf=true"   # Molecular Function. Default: false
+    - "--go-distribution-bp=true"   # Biological Process. Default: false
+    - "--go-distribution-cc=true"   # Cellular Component. Default: false
     # Full functional data is now integrated; enable all EC distribution charts
     - "--main-level=true"
     - "--oxidoreductases=true"
@@ -272,7 +272,7 @@ final_annotation_charts:
 project_charts:
   outdir: "12_project_charts"
   args:
-    - "--data-distribution=true"           # Generate data distribution chart. Default: true
+    - "--data-distribution=true"           # Generate data distribution chart. Default: false
     - "--data-distribution-pie-chart=true" # Generate data distribution pie chart. Default: false
     - "--analysis-progress=true"           # Generate analysis progress chart. Default: false
     - "--seq-length=true"                  # Generate sequence length distribution chart. Default: false
@@ -302,7 +302,7 @@ go_slim:
 
 goslim_annotation_charts:
   outdir: "13_goslim_charts"
-  # Reuses the statistics-annotation rule; tailored for the GO Slim project.
+  # Reuses the statistics_annotation rule (omicsbox go-annotation-charts); tailored for the GO Slim project.
   args:
     - "--annotation-distribution=true"
     - "--go-annotation-level-distribution=true"

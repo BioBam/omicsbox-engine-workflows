@@ -1,5 +1,5 @@
 // --- FILE: modules/metagenomics/cont_rem.nf ---
-// Wraps: omicsbox cont-rem
+// Wraps: omicsbox contaminant-removal
 // Removes contaminant reads (e.g. host/human DNA) from metagenomic libraries.
 
 process CONT_REM {
@@ -36,7 +36,7 @@ process CONT_REM {
     if (!is_single_end) {
         def up_pat = params.getOrDefault('upstream_pattern', '_1')
         def down_pat = params.getOrDefault('downstream_pattern', '_2')
-        pattern_flags = "--upstream-pattern-preprocessing=${up_pat} --downstream-pattern-preprocessing=${down_pat}"
+        pattern_flags = "--upstream-pattern=${up_pat} --downstream-pattern=${down_pat}"
     }
 
     // Optional-input convention: when no custom target genome is wired in, the workflow passes an
@@ -48,11 +48,16 @@ process CONT_REM {
 
     """
     mkdir -p ${outdir}
-    omicsbox cont-rem \\
+    omicsbox contaminant-removal \\
         ${input_flag} \\
         ${pattern_flags} \\
         ${target_flag} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}
+
+    # Async tools write each folder output into ${outdir}/<output-key>/; the output globs
+    # above expect those files at the top of ${outdir}.
+    find ${outdir} -mindepth 2 -maxdepth 2 -type f -exec mv -n {} ${outdir}/ \\;
+    find ${outdir} -mindepth 1 -type d -empty -delete
     """
 }

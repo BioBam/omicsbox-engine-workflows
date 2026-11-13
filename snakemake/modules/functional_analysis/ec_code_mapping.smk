@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/ec_code_mapping.smk ---
-# Wraps: omicsbox enzymecode - maps Enzyme Commission codes from GO annotations.
+# Wraps: omicsbox enzyme-code-mapping - maps Enzyme Commission codes from GO annotations.
 #
 # Generic, reusable rule (operation = `enzymecode`). Instantiate with:
 #   use rule enzymecode as <step> with:
@@ -13,7 +13,7 @@ rule enzymecode:
     shell:
         r"""
         (
-            omicsbox enzymecode \
+            omicsbox enzyme-code-mapping \
                 --i-project="{input.project}" \
                 --local-folder="{params.outdir}" \
                 {params.args}

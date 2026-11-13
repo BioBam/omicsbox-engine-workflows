@@ -1,5 +1,5 @@
 # --- FILE: modules/genetic_variation/variant_filtering.smk ---
-# Wraps: omicsbox variant-filtering-freebayes - filters a VCF by quality, depth,
+# Wraps: omicsbox variant-filtering - filters a VCF by quality, depth,
 # allele frequency and missingness criteria.
 #
 # Generic, reusable rule (operation = `variant_filtering_freebayes`). Instantiate with:
@@ -30,7 +30,7 @@ rule variant_filtering_freebayes:
     shell:
         r"""
         (
-            omicsbox variant-filtering-freebayes \
+            omicsbox variant-filtering \
                 --i-input-file="{input.vcf}" \
                 --chart-format="{params.chart_format}" \
                 --local-folder="{params.outdir}" \

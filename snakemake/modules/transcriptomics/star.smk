@@ -1,5 +1,5 @@
 # --- FILE: modules/transcriptomics/star.smk ---
-# Wraps: omicsbox star-aligner - aligns RNA-Seq reads to a reference genome.
+# Wraps: omicsbox star - aligns RNA-Seq reads to a reference genome.
 #
 # Generic, reusable rule (operation = `star_aligner`). Self-contained: the SE/PE
 # branch, comma-joining, and accepting either a literal FASTQ file list or a
@@ -75,13 +75,18 @@ rule star_aligner:
                 pattern_flags="--upstream-pattern={params.up_pattern} --downstream-pattern={params.down_pattern}"
             fi
 
-            omicsbox star-aligner \
+            omicsbox star \
                 $input_flag \
                 $pattern_flags \
                 --i-fasta-file="{input.fasta}" \
                 {params.annotation_flag} \
                 --local-folder="{output}" \
                 {params.args}
+
+            # Async tools write each folder output into <local-folder>/<output-key>/; the
+            # steps below and downstream rules expect those files at the top of the folder.
+            find "{output}" -mindepth 2 -maxdepth 2 -type f -exec mv -n {{}} "{output}"/ \;
+            find "{output}" -mindepth 1 -type d -empty -delete
 
             # Strip the aligner's own suffix down to a plain <sample>.bam - see the
             # header comment for why.

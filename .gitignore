@@ -12,3 +12,14 @@ work/
 
 #Ignore results folder
 results/
+
+# Snakemake metadata and caches
+.snakemake/
+
+# Config templates exported via `snakemake ... dump_config`
+*.config.yaml
+
+# Python caches
+__pycache__/
+*.pyc
+

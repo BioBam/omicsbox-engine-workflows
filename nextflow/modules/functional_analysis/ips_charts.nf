@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/ips_charts.nf ---
-// Wraps: omicsbox statistics-interpro
+// Wraps: omicsbox interproscan-charts
 // Generates InterProScan domain distribution charts.
 
 process IPS_CHARTS {
@@ -16,7 +16,7 @@ process IPS_CHARTS {
 
     """
     mkdir -p ${outdir}
-    omicsbox statistics-interpro \\
+    omicsbox interproscan-charts \\
         --i-project=\$PWD/${project} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

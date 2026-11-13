@@ -1,0 +1,192 @@
+# =============================================================================
+# FILE: workflows/metagenomics_analysis/config.yaml
+# User-editable configuration for the Metagenomics Analysis pipeline.
+#
+# This is the file `snakemake ... dump_config` exports for you to edit. It holds
+# every user-facing parameter.
+#
+# HOW TO OVERRIDE:
+#   * copy this file with `snakemake ... dump_config` and edit the copy, then
+#     pass it with `--configfile metagenomics_analysis.config.yaml`
+#   * or override single keys inline: `--config input_paired_end='data/*_{1,2}.fastq.gz'`
+#
+# Uncomment a list item to enable that flag (parameters blocked by dependencies stay
+# commented until their dependency is turned on).
+#
+# NOTE: each step's `args` is replaced as a WHOLE LIST, never merged item by item.
+# Edit flags inside the full list below; do not hand-write a minimal `args:` with a
+# single flag, or the rest of that step's flags are dropped.
+# =============================================================================
+
+# ---------------------------------------------------
+# WORKFLOW PARAMETERS
+# ---------------------------------------------------
+# Reads: give EXACTLY ONE of the two globs. Which one you set is also what tells the
+# tools whether to expect read pairs.
+input_single_end: null             # Glob for single-end reads (e.g. 'data/*.fastq.gz')
+input_paired_end: null             # Glob for paired-end reads (e.g. 'data/*_{1,2}.fastq.gz')
+
+chart_format: "box"                # Output chart format for all chart steps: [box, png, pdf, csv]
+
+# --- R1/R2 filename patterns, PAIRED-END only ---
+# upstream_pattern: "_1"           # R1 filename pattern (e.g. '_1' -> sample_1.fastq.gz)
+# downstream_pattern: "_2"         # R2 filename pattern (e.g. '_2' -> sample_2.fastq.gz)
+
+# --- Optional input files (leave null unless you need them) ---
+fastqc_adapters: null              # Custom adapter FASTA screened by both QC steps
+fastqc_contaminants: null          # Custom contaminant FASTA screened by both QC steps
+trimmomatic_adapters: null         # Custom adapter FASTA used for trimming
+cont_rem_target_genome: null       # Custom genome to screen contaminants against, instead
+                                   # of one of the built-in indexes. If you set this, you
+                                   # MUST also change `--target-index` in the cont_rem block
+                                   # below to 'Create database from genome' - the two have
+                                   # to agree or the step fails.
+
+# --- Output location (results go to <local_folder>/<run_id>/) ---
+local_folder: "results"            # Base output directory
+run_id: null                       # Run sub-folder: YOU name the run. null -> the workflow
+                                   # name "metagenomics_analysis". Paths are deterministic,
+                                   # so reusing a run_id resumes it; use a fresh name to
+                                   # isolate a run.
+
+# ---------------------------------------------------
+# PER-STEP CONFIGURATION
+# `outdir` is the step's numbered result sub-folder; `args` is the list of flags
+# injected into its `omicsbox` call.
+# ---------------------------------------------------
+
+# =================================================================
+# PHASE 1: RAW QUALITY CONTROL (PRE-TRIMMING)
+# =================================================================
+fastqc_raw:
+  outdir: "01_fastqc_raw"
+  args:
+    - "--binning=true"   # [true, false] Group bases in QC plots. Default: true
+
+# =================================================================
+# PHASE 2: READ PREPROCESSING & TRIMMING
+# =================================================================
+trimmomatic:
+  outdir: "02_trimmomatic"
+  args:
+    - "--quality-encoding=auto"              # [auto, phred33, phred64] Auto-detect read quality encoding. Default: auto
+
+    # -- Adapter Removal --
+    # - "--prefix=trimmed_"                  # Output filename prefix
+    - "--remove-adapters=false"              # [true, false] Enable adapter/contaminant trimming. Default: false
+    # - "--adapter-options=default"          # [default, custom] Adapter removal strategy (only if remove-adapters=true)
+    # - "--adapter-list=TruSeq3-SE.fa"       # [TruSeq3-SE.fa, TruSeq2-SE.fa, NexteraPE-PE.fa] Adapter list (only if adapter-options=default)
+    # - "--seed-mismatches=2"                # Max mismatches for full adapter match (only if remove-adapters=true)
+    # - "--simple-clip-threshold=15"         # Simple adapter match accuracy threshold (only if remove-adapters=true)
+    # - "--palindrome-clip-threshold=30"     # Palindrome clip accuracy threshold (only if remove-adapters=true; PAIRED-END only - errors if set with single-end)
+
+    # -- Paired-End Mode -- (PAIRED-END ONLY, do not enable for single-end input)
+    # - "--min-adapter-length=8"             # Min detectable adapter length in palindrome mode (only if remove-adapters=true; PAIRED-END only)
+    # - "--keep-both-reads=true"             # Retain reverse read after palindrome detection (only if remove-adapters=true; PAIRED-END only)
+
+    # -- Edge Trimming --
+    - "--edge-trimming=false"                # [true, false] Enable edge trimming. Default: false
+    # - "--edge-trimming-options=qual"       # [qual, length] Edge trimming strategy (only if edge-trimming=true)
+    # - "--qual-trimming-from5p=true"        # Trim low-quality bases from 5' (only if edge-trimming-options=qual)
+    # - "--normal-trimming-threshold5p=30"   # Min quality threshold at 5' (only if qual-trimming-from5p=true)
+    # - "--qual-trimming-from3p=true"        # Trim low-quality bases from 3' (only if edge-trimming-options=qual)
+    # - "--normal-trimming-threshold3p=30"   # Min quality threshold at 3' (only if qual-trimming-from3p=true)
+    # - "--length-trimming-from5p=false"     # Crop N bases from 5' (only if edge-trimming-options=length)
+    # - "--length-trimming-threshold5p-remove=3"   # Bases to remove from 5' (only if length-trimming-from5p=true)
+    # - "--length-trimming-from3p=false"     # Crop to fixed length from 3' (only if edge-trimming-options=length)
+    # - "--length-trimming-threshold3p-keep=150"   # Bases to keep from start (only if length-trimming-from3p=true)
+
+    # -- Quality Trimming --
+    - "--quality-trimming=false"             # [true, false] Enable sliding-window or maxinfo trimming
+    # - "--quality-trimming-options=sliding" # [sliding, maxinfo] Quality trimming strategy (only if quality-trimming=true)
+    # - "--window-size=4"                    # Sliding window width (only if quality-trimming-options=sliding)
+    # - "--required-quality=15"              # Min avg quality in window (only if quality-trimming-options=sliding)
+    # - "--target-length=40"                 # Target read length for maxinfo (only if quality-trimming-options=maxinfo)
+    # - "--strictness=0.5"                   # [0..1] Length vs correctness tradeoff (only if quality-trimming-options=maxinfo)
+
+    # -- Quality & Length Filtering --
+    - "--filter-by-quality=true"             # [true, false] Discard reads below average quality. Default: true
+    - "--average-quality=25"                 # [integer] Min average quality to retain a read (only if filter-by-quality=true)
+    - "--filter-by-length=true"              # [true, false] Discard reads below minimum length. Default: true
+    - "--minimum-length=36"                  # [integer] Minimum retained read length in bp (only if filter-by-length=true)
+
+# =================================================================
+# PHASE 3: QUALITY CONTROL (POST-TRIMMING)
+# =================================================================
+fastqc_post:
+  outdir: "03_fastqc_post"
+  args:
+    - "--binning=true"   # [true, false] Group bases in QC plots. Default: true
+
+# =================================================================
+# PHASE 4: CONTAMINANT REMOVAL
+# =================================================================
+cont_rem:
+  outdir: "04_contaminant_removal"
+  args:
+    - "--result-mode=only_other"             # [only_aligned, only_other, both] Which read set to keep.
+                                             # CRITICAL: the assembly step consumes the reads that did
+                                             # NOT match the target, so keep 'only_other'. Default: only_other
+    - "--target-index='Homo sapiens (grch38)'"   # [Create database from genome, Homo sapiens (grch38),
+                                             # Mus musculus (grcm39), Arabidopsis thaliana (tair10_1), PhiX]
+                                             # Which genome to screen against. Default: Homo sapiens (grch38).
+                                             # Choose 'Create database from genome' ONLY together with
+                                             # `cont_rem_target_genome` at the top of this file.
+
+# =================================================================
+# PHASE 5: DE NOVO METAGENOME ASSEMBLY (MEGAHIT)
+# =================================================================
+megahit:
+  outdir: "05_megahit"
+  args:
+    # -- Basic --
+    - "--minimum-multiplicity=2"             # [integer] Default: 2
+    - "--kmer-sizes=29,39,59,79,99,119,141"  # [string] Default: 29,39,59,79,99,119,141
+
+    # -- Advanced --
+    - "--no-mercy-kmers=false"               # [true, false] Default: false
+    - "--bubble-level=2"                     # [0, 1, 2] Default: 2
+    - "--bubble-merge-l=20"                  # [integer] Default: 20
+    - "--bubble-merge-s=0.95"                # [double] Default: 0.95
+    - "--prune-level=2"                      # [0, 1, 2, 3] Default: 2
+    - "--prune-depth=2"                      # [integer] Default: 2
+    - "--low-local-ratio=0.2"                # [double] Default: 0.2
+    - "--max-tip-length=2"                   # [integer] Default: 2
+    - "--no-local=false"                     # [true, false] Default: false
+    - "--min-contig-length=200"              # [integer] Default: 200
+    - "--kmin1pass=false"                    # [true, false] Default: false
+
+# =================================================================
+# PHASE 6: GENE PREDICTION (PRODIGAL)
+# =================================================================
+prodigal:
+  outdir: "06_prodigal"
+  args:
+    - "--procedure=meta"                     # [single, meta] CRITICAL for metagenomics. Default: meta
+    - "--genetic-code=0"                     # [0, 1, 2, ...] Translation table. Default: 0 (Auto)
+    - "--closed-ends=false"                  # [true, false] Default: false
+    - "--masked-ns=false"                    # [true, false] Default: false
+    - "--skip-shine-dalgarno=false"          # [true, false] Default: false
+
+# =================================================================
+# PHASE 7: DOMAIN ANNOTATION (PFAM-SCAN) - parallel with phase 8
+# =================================================================
+pfam_scan:
+  outdir: "07_pfam_scan"
+  args: []
+
+# =================================================================
+# PHASE 8: FUNCTIONAL ANNOTATION (EGGNOG-MAPPER) - parallel with phase 7
+# =================================================================
+eggnog_mapper:
+  outdir: "08_eggnog_mapper"
+  args:
+    - "--i-type-options=genes"               # [cds, genes, proteins] Input sequence type. Default: genes
+
+    # -- Annotation Options --
+    - "--taxonomic-scope=auto"               # [auto, ...] Taxonomic scope for annotation. Default: auto
+    - "--target-orthologs=all"               # [all, one2one, many2one, one2many, many2many] Default: all
+    - "--go-evidence=non-electronic"         # [experimental, non-electronic] GO evidence type filter. Default: non-electronic
+
+    # -- Search Filters --
+    - "--blast-expect-value=1.0E-3"          # E-value threshold for BLAST. Default: 1.0E-3

@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/diamond_blast.smk ---
-# Wraps: omicsbox diamond - sequence similarity search via DIAMOND BLAST.
+# Wraps: omicsbox blast-diamond - sequence similarity search via DIAMOND BLAST.
 #
 # Generic, reusable rule (operation = `diamond`). Instantiate with:
 #   use rule diamond as <step> with:
@@ -16,7 +16,7 @@ rule diamond:
     shell:
         r"""
         (
-            omicsbox diamond \
+            omicsbox blast-diamond \
                 --i-local-project="{input.project}" \
                 --local-folder="{params.outdir}" \
                 {params.args}

@@ -1,5 +1,5 @@
 // --- FILE: modules/utilities/combine_projects.nf ---
-// Wraps: omicsbox combine-projects
+// Wraps: omicsbox merge-projects
 // Merges multiple OmicsBox projects into one.
 
 process COMBINE_PROJECTS {
@@ -17,7 +17,7 @@ process COMBINE_PROJECTS {
 
     """
     mkdir -p ${outdir}
-    omicsbox combine-projects \\
+    omicsbox merge-projects \\
         --i-project1=\$PWD/${project1} \\
         --i-project2=\$PWD/${project2} \\
         --local-folder=\$PWD/${outdir} \\

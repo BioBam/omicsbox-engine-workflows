@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/validate_go_annotation.nf ---
-// Wraps: omicsbox annotation-validate
+// Wraps: omicsbox go-annotation-validate
 // Validates GO annotations using True-Path-Rule.
 
 process VALIDATE_GO_ANNOTATION {
@@ -16,7 +16,7 @@ process VALIDATE_GO_ANNOTATION {
 
     """
     mkdir -p ${outdir}
-    omicsbox annotation-validate \\
+    omicsbox go-annotation-validate \\
         --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

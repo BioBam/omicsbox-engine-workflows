@@ -1,5 +1,5 @@
 // --- FILE: modules/genetic_variation/variant_filtering.nf ---
-// Wraps: omicsbox variant-filtering-freebayes
+// Wraps: omicsbox variant-filtering
 // Variant Filtering: filters a VCF by quality/depth/MAF/missingness criteria.
 
 process VARIANT_FILTERING {
@@ -18,7 +18,7 @@ process VARIANT_FILTERING {
 
     """
     mkdir -p ${outdir}
-    omicsbox variant-filtering-freebayes \\
+    omicsbox variant-filtering \\
         --i-input-file=\$PWD/${vcf} \\
         --chart-format=${params.chart_format} \\
         --local-folder=\$PWD/${outdir} \\

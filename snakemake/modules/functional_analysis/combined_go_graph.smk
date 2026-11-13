@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/combined_go_graph.smk ---
-# Wraps: omicsbox graph-combined-make - combined GO graph (terminal step).
+# Wraps: omicsbox go-graph-combined - combined GO graph (terminal step).
 #
 # Generic, reusable rule (operation = `graph_combined_make`). No --chart-format.
 # Instantiate with:
@@ -15,7 +15,7 @@ rule graph_combined_make:
         r"""
         (
             mkdir -p {output}
-            omicsbox graph-combined-make \
+            omicsbox go-graph-combined \
                 --i-project="{input.project}" \
                 --local-folder="{output}" \
                 {params.args}

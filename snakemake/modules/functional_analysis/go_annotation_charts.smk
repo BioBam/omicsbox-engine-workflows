@@ -1,5 +1,5 @@
 # --- FILE: modules/functional_analysis/go_annotation_charts.smk ---
-# Wraps: omicsbox statistics-annotation - GO annotation distribution charts.
+# Wraps: omicsbox go-annotation-charts - GO annotation distribution charts.
 #
 # ONE generic, reusable rule (operation = `statistics_annotation`). Several steps
 # chart annotations at different points of a pipeline, so the module stays a SINGLE
@@ -18,7 +18,7 @@ rule statistics_annotation:
         r"""
         (
             mkdir -p {output}
-            omicsbox statistics-annotation \
+            omicsbox go-annotation-charts \
                 --i-project="{input.project}" \
                 --chart-format={params.chart_format} \
                 --local-folder="{output}" \

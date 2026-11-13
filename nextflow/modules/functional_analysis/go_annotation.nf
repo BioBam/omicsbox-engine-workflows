@@ -1,5 +1,5 @@
 // --- FILE: modules/functional_analysis/go_annotation.nf ---
-// Wraps: omicsbox annotation
+// Wraps: omicsbox go-annotation
 // BLAST2GO functional annotation.
 
 process GO_ANNOTATION {
@@ -16,7 +16,7 @@ process GO_ANNOTATION {
 
     """
     mkdir -p ${outdir}
-    omicsbox annotation \\
+    omicsbox go-annotation \\
         --i-project=\$PWD/${project} \\
         --local-folder=\$PWD/${outdir} \\
         ${args}

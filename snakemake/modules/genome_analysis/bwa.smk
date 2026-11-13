@@ -65,5 +65,10 @@ rule bwa:
                 $pattern_flags \
                 --local-folder="{output}" \
                 {params.args}
+
+            # Async tools write each folder output into <local-folder>/<output-key>/; the
+            # steps below and downstream rules expect those files at the top of the folder.
+            find "{output}" -mindepth 2 -maxdepth 2 -type f -exec mv -n {{}} "{output}"/ \;
+            find "{output}" -mindepth 1 -type d -empty -delete
         ) >{log} 2>&1
         """
